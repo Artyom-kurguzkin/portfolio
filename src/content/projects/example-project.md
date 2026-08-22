@@ -1,8 +1,10 @@
 ---
 title: Example Project
 summary: A short one- or two-sentence description of what this project is and why it matters.
+category: Web
 stack: [Astro, TypeScript]
 link: https://github.com/your-username/example-project
+image: /img/thumb-code.svg
 date: 2026-08-01
 ---
 

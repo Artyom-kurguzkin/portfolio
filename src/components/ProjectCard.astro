@@ -3,57 +3,99 @@ import type { CollectionEntry } from 'astro:content';
 
 interface Props {
 	project: CollectionEntry<'projects'>;
+	index?: number;
 }
 
-const { project } = Astro.props;
+const { project, index = 0 } = Astro.props;
 const href = `${import.meta.env.BASE_URL}projects/${project.id}/`;
+
+const accents = ['var(--color-blue)', 'var(--color-coral)', 'var(--color-periwinkle)'];
+const tileColor = accents[index % accents.length];
+const initial = project.data.title.charAt(0).toUpperCase();
 ---
 
-<article>
-	<a href={href}>
-		<h3>{project.data.title}</h3>
-	</a>
-	<p>{project.data.summary}</p>
+<a
+	href={href}
+	class="tile"
+	data-title={project.data.title}
+	data-date={project.data.date.toISOString()}
+	data-category={project.data.category}
+>
 	{
-		project.data.stack.length > 0 && (
-			<ul class="stack">
-				{project.data.stack.map((tech) => <li>{tech}</li>)}
-			</ul>
+		project.data.image ? (
+			<img class="avatar" src={`${import.meta.env.BASE_URL}${project.data.image.replace(/^\//, '')}`} alt="" />
+		) : (
+			<span class="avatar" style={`background:${tileColor}`}>
+				{initial}
+			</span>
 		)
 	}
-</article>
+	<span class="title">{project.data.title}</span>
+</a>
 
 <style>
-	article {
-		padding: 1.25rem 0;
-		border-bottom: 1px solid #e5e5e5;
-	}
-
-	h3 {
-		margin: 0 0 0.25rem;
-	}
-
-	a {
-		text-decoration: none;
-		color: inherit;
-	}
-
-	a:hover h3 {
-		color: var(--color-accent);
-	}
-
-	p {
-		margin: 0.25rem 0;
-		color: var(--color-muted);
-	}
-
-	.stack {
-		list-style: none;
+	.tile {
 		display: flex;
-		gap: 0.5rem;
-		padding: 0;
-		margin: 0.5rem 0 0;
-		font-size: 0.8rem;
-		color: var(--color-muted);
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1rem;
+		border-radius: var(--radius-md);
+		border: var(--border-card);
+		text-decoration: none;
+		color: var(--color-ink);
+	}
+
+	.avatar {
+		width: 100%;
+		aspect-ratio: 1;
+		border-radius: var(--radius-md);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		object-fit: cover;
+		font-family: var(--font-display);
+		font-size: 2rem;
+		font-weight: 700;
+		color: #fff;
+	}
+
+	.title {
+		flex: 1 1 auto;
+		min-width: 0;
+		font-weight: 600;
+		overflow-wrap: break-word;
+	}
+
+	/* narrow gallery (mobile, ~1 column): a big square icon per row wastes space,
+	   switch to a compact horizontal row instead */
+	@container gallery (max-width: 26rem) {
+		.tile {
+			flex-direction: row;
+			align-items: center;
+			gap: 0.75rem;
+			padding: 0.75rem;
+		}
+
+		.avatar {
+			width: 2.75rem;
+			height: 2.75rem;
+			aspect-ratio: 1;
+			flex: none;
+			font-size: 1.1rem;
+		}
+	}
+
+	.tile:hover {
+		border-color: var(--color-ink);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.tile {
+			transition: transform 0.15s ease, border-color 0.15s ease;
+		}
+
+		.tile:hover {
+			transform: translateY(-3px);
+		}
 	}
 </style>

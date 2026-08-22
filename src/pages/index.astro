@@ -1,21 +1,296 @@
 ---
 import { getCollection } from 'astro:content';
+import { PROJECT_CATEGORIES } from '../content.config';
 import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
+import { Content as AboutContent } from '../data/about.md';
+import { Content as ContactContent } from '../data/contact.md';
+import { Content as ExpertiseContent } from '../data/expertise.md';
 
 const projects = (await getCollection('projects')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+const writings = (await getCollection('writings')).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 );
 ---
 
 <Layout title="Home">
-	<section>
-		<h1>Hi, I'm your name.</h1>
-		<p>A short intro blurb goes here — edit this in src/pages/index.astro.</p>
-	</section>
+	<div class="board">
+		<div class="panel about">
+			<AboutContent />
+		</div>
 
-	<section>
-		<h2>Projects</h2>
-		{projects.map((project) => <ProjectCard project={project} />)}
-	</section>
+		<div class="panel contact">
+			<h2>Contact</h2>
+			<ContactContent />
+		</div>
+
+		<div class="panel expertise">
+			<h2>Areas of Expertise</h2>
+			<ExpertiseContent />
+		</div>
+
+		<div class="panel projects">
+			<h2>
+				Projects <span class="pill count" style="background:var(--color-blue)">{projects.length}</span>
+			</h2>
+
+			<div class="controls">
+				<div class="filters" role="group" aria-label="Filter by category">
+					<button type="button" class="chip active" data-filter="all">All</button>
+					{
+						PROJECT_CATEGORIES.map((category) => (
+							<button type="button" class="chip" data-filter={category}>
+								{category}
+							</button>
+						))
+					}
+				</div>
+				<select id="sort" aria-label="Sort projects">
+					<option value="date-desc">Newest</option>
+					<option value="date-asc">Oldest</option>
+					<option value="title-asc">Title A–Z</option>
+				</select>
+			</div>
+
+			<div class="gallery" id="gallery">
+				{projects.map((project, index) => <ProjectCard project={project} index={index} />)}
+			</div>
+		</div>
+
+		<div class="panel writings">
+			<h2>
+				Writings <span class="pill count" style="background:var(--color-coral)">{writings.length}</span>
+			</h2>
+			<ul class="writing-list">
+				{
+					writings.map((post) => (
+						<li>
+							<a href={post.data.link} target="_blank" rel="noopener noreferrer">
+								{post.data.title}
+							</a>
+							{post.data.summary && <p>{post.data.summary}</p>}
+						</li>
+					))
+				}
+			</ul>
+		</div>
+	</div>
 </Layout>
+
+<script>
+	const gallery = document.getElementById('gallery')!;
+	const chips = document.querySelectorAll<HTMLButtonElement>('.chip');
+	const sortSelect = document.getElementById('sort') as HTMLSelectElement;
+
+	function applyFilter() {
+		const active = document.querySelector('.chip.active')?.getAttribute('data-filter') ?? 'all';
+		for (const tile of gallery.children) {
+			const el = tile as HTMLElement;
+			el.classList.toggle('is-hidden', active !== 'all' && el.dataset.category !== active);
+		}
+	}
+
+	function applySort() {
+		const [key, dir] = sortSelect.value.split('-');
+		const tiles = [...gallery.children] as HTMLElement[];
+		tiles.sort((a, b) => {
+			const cmp =
+				key === 'date'
+					? new Date(a.dataset.date ?? 0).getTime() - new Date(b.dataset.date ?? 0).getTime()
+					: (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
+			return dir === 'desc' ? -cmp : cmp;
+		});
+		tiles.forEach((tile) => gallery.append(tile));
+	}
+
+	chips.forEach((chip) => {
+		chip.addEventListener('click', () => {
+			chips.forEach((c) => c.classList.remove('active'));
+			chip.classList.add('active');
+			applyFilter();
+		});
+	});
+
+	sortSelect.addEventListener('change', applySort);
+</script>
+
+<style>
+	.board {
+		display: grid;
+		gap: 1.25rem;
+		max-width: var(--content-width);
+		margin-inline: auto;
+		grid-template-columns: 1fr;
+		grid-template-areas:
+			'about'
+			'contact'
+			'expertise'
+			'projects'
+			'writings';
+	}
+
+	/* tablet: pair the two short profile cards side by side */
+	@media (min-width: 40rem) {
+		.board {
+			grid-template-columns: 1fr 1fr;
+			grid-template-areas:
+				'about about'
+				'contact expertise'
+				'projects projects'
+				'writings writings';
+		}
+	}
+
+	/* desktop: About becomes a tall lead block beside a stacked profile column */
+	@media (min-width: 60rem) {
+		.board {
+			max-width: 68rem;
+			grid-template-columns: 1fr 1fr 1fr;
+			grid-template-areas:
+				'about about contact'
+				'about about expertise'
+				'projects projects projects'
+				'writings writings writings';
+		}
+	}
+
+	.panel {
+		margin: 0;
+		max-width: none;
+	}
+
+	.about {
+		grid-area: about;
+	}
+
+	.about :global(h1) {
+		color: var(--color-coral);
+	}
+
+	.contact {
+		grid-area: contact;
+	}
+
+	.contact h2 {
+		color: var(--color-periwinkle);
+	}
+
+	.expertise {
+		grid-area: expertise;
+	}
+
+	.expertise h2 {
+		color: var(--color-blue);
+	}
+
+	.expertise :global(ul) {
+		padding-left: 1.1rem;
+		margin: 0.5rem 0 0;
+	}
+
+	.expertise :global(li) {
+		margin-bottom: 0.4rem;
+	}
+
+	.projects {
+		grid-area: projects;
+	}
+
+	.projects h2 {
+		color: var(--color-periwinkle);
+	}
+
+	.writings {
+		grid-area: writings;
+	}
+
+	.writings h2 {
+		color: var(--color-coral);
+	}
+
+	h2 {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.count {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: #fff;
+	}
+
+	.controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin: 1rem 0;
+	}
+
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+
+	.chip,
+	#sort {
+		font: inherit;
+		border: 1px solid rgba(23, 23, 28, 0.15);
+		border-radius: 999px;
+		padding: 0.3rem 0.85rem;
+		font-size: 0.85rem;
+		background: var(--color-surface);
+		color: var(--color-ink);
+	}
+
+	.chip {
+		cursor: pointer;
+	}
+
+	.chip.active {
+		background: var(--color-ink);
+		color: var(--color-surface);
+		border-color: var(--color-ink);
+	}
+
+	.gallery {
+		container: gallery / inline-size;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+		gap: 1rem;
+	}
+
+	.writing-list {
+		list-style: none;
+		padding: 0;
+		margin: 1rem 0 0;
+	}
+
+	.writing-list li {
+		padding: 0.75rem 0;
+		border-bottom: 1px solid rgba(23, 23, 28, 0.08);
+	}
+
+	.writing-list li:last-child {
+		border-bottom: none;
+	}
+
+	.writing-list a {
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.writing-list a:hover {
+		color: var(--color-coral);
+	}
+
+	.writing-list p {
+		margin: 0.25rem 0 0;
+		color: var(--color-muted);
+	}
+</style>

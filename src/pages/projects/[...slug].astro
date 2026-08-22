@@ -12,11 +12,106 @@ export async function getStaticPaths() {
 
 const { project } = Astro.props;
 const { Content } = await render(project);
+
+const tints = ['var(--tint-blue)', 'var(--tint-coral)', 'var(--tint-periwinkle)'];
 ---
 
 <Layout title={project.data.title} description={project.data.summary}>
-	<a href={`${import.meta.env.BASE_URL}`}>&larr; Back</a>
-	<h1>{project.data.title}</h1>
-	{project.data.link && <p><a href={project.data.link}>{project.data.link}</a></p>}
-	<Content />
+	<a class="back" href={`${import.meta.env.BASE_URL}`} aria-label="Back to main page">&larr;</a>
+
+	<div class="panel">
+		{
+			project.data.image && (
+				<img
+					class="cover"
+					src={`${import.meta.env.BASE_URL}${project.data.image.replace(/^\//, '')}`}
+					alt=""
+				/>
+			)
+		}
+		<span class="pill category" style="background:var(--color-blue)">{project.data.category}</span>
+		<h1>{project.data.title}</h1>
+		<p class="summary">{project.data.summary}</p>
+		{
+			project.data.stack.length > 0 && (
+				<ul class="stack">
+					{project.data.stack.map((tech, i) => (
+						<li class="pill" style={`background:${tints[i % tints.length]}`}>
+							{tech}
+						</li>
+					))}
+				</ul>
+			)
+		}
+		{
+			project.data.link && (
+				<p>
+					<a class="pill" href={project.data.link} style="background:var(--color-yellow)">
+						{project.data.link}
+					</a>
+				</p>
+			)
+		}
+		<Content />
+	</div>
 </Layout>
+
+<style>
+	.back {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: 999px;
+		background: var(--color-surface);
+		border: var(--border-card);
+		font-size: 1.25rem;
+		text-decoration: none;
+	}
+
+	.back:hover {
+		border-color: var(--color-ink);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.back {
+			transition: transform 0.15s ease, border-color 0.15s ease;
+		}
+
+		.back:hover {
+			transform: translateX(-3px);
+		}
+	}
+
+	.cover {
+		width: 100%;
+		max-height: 16rem;
+		object-fit: cover;
+		border-radius: var(--radius-md);
+		margin-bottom: 1.25rem;
+	}
+
+	.category {
+		color: #fff;
+		font-weight: 700;
+		margin-bottom: 0.75rem;
+	}
+
+	h1 {
+		color: var(--color-blue);
+	}
+
+	.summary {
+		color: var(--color-muted);
+	}
+
+	.stack {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		padding: 0;
+		margin: 0.75rem 0;
+	}
+</style>

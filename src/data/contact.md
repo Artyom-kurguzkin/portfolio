@@ -1,6 +1,5 @@
 ---
 title: Contact
-layout: ../layouts/Layout.astro
 ---
 
 Email: your-email@example.com
