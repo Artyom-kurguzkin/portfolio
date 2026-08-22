@@ -1,0 +1,59 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+	project: CollectionEntry<'projects'>;
+}
+
+const { project } = Astro.props;
+const href = `${import.meta.env.BASE_URL}projects/${project.id}/`;
+---
+
+<article>
+	<a href={href}>
+		<h3>{project.data.title}</h3>
+	</a>
+	<p>{project.data.summary}</p>
+	{
+		project.data.stack.length > 0 && (
+			<ul class="stack">
+				{project.data.stack.map((tech) => <li>{tech}</li>)}
+			</ul>
+		)
+	}
+</article>
+
+<style>
+	article {
+		padding: 1.25rem 0;
+		border-bottom: 1px solid #e5e5e5;
+	}
+
+	h3 {
+		margin: 0 0 0.25rem;
+	}
+
+	a {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	a:hover h3 {
+		color: var(--color-accent);
+	}
+
+	p {
+		margin: 0.25rem 0;
+		color: var(--color-muted);
+	}
+
+	.stack {
+		list-style: none;
+		display: flex;
+		gap: 0.5rem;
+		padding: 0;
+		margin: 0.5rem 0 0;
+		font-size: 0.8rem;
+		color: var(--color-muted);
+	}
+</style>

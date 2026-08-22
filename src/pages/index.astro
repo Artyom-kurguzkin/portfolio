@@ -1,0 +1,21 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+
+const projects = (await getCollection('projects')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+---
+
+<Layout title="Home">
+	<section>
+		<h1>Hi, I'm your name.</h1>
+		<p>A short intro blurb goes here — edit this in src/pages/index.astro.</p>
+	</section>
+
+	<section>
+		<h2>Projects</h2>
+		{projects.map((project) => <ProjectCard project={project} />)}
+	</section>
+</Layout>
