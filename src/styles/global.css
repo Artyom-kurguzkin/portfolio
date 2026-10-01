@@ -1,6 +1,6 @@
 /* === Tokens === */
 :root {
-	--color-bg: #f5eee2;
+	--color-bg: #1e1e24;
 	--color-surface: #ffffff;
 	--color-ink: #17171c;
 	--color-muted: rgba(23, 23, 28, 0.62);
@@ -8,9 +8,17 @@
 	--color-coral: #f5613d;
 	--color-periwinkle: #7c6ff0;
 	--color-yellow: #ffc94d;
+	--color-green: #22a06b;
+	/* green dashed outline for hover/focus in lists and galleries (see :where(...)::before).
+	   Colour is baked in: keep the stroke in sync with --color-green.
+	   The pill sets only ry=50% (of height); rx then copies it, so corners stay round on wide
+	   chips. Setting rx=999 made SVG clamp rx to half the width and draw an oval. */
+	--dash-pill: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' ry='50%25' fill='none' stroke='%2322a06b' stroke-width='4' stroke-dasharray='10 8' stroke-linecap='round'/></svg>");
+	--dash-box: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' rx='16' fill='none' stroke='%2322a06b' stroke-width='4' stroke-dasharray='10 8' stroke-linecap='round'/></svg>");
 
-	--font-display: 'Fraunces', Georgia, serif;
-	--font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+	/* Consolas ships with Windows; elsewhere Cascadia Mono (Google Fonts) stands in */
+	--font-display: Consolas, 'Cascadia Mono', monospace;
+	--font-body: Consolas, 'Cascadia Mono', monospace;
 
 	--tint-blue: color-mix(in srgb, var(--color-blue) 25%, white);
 	--tint-coral: color-mix(in srgb, var(--color-coral) 25%, white);
@@ -85,13 +93,122 @@ img {
 
 /* === Utilities === */
 .panel {
+	position: relative;
 	max-width: var(--content-width);
 	margin-block: clamp(1rem, 4vw, 2rem);
 	margin-inline: auto;
-	background: var(--color-surface);
-	border: var(--border-card);
+	background-color: var(--color-surface);
+	color: var(--color-ink);
 	border-radius: var(--radius-lg);
 	padding: clamp(1.25rem, 5vw, 2.5rem);
+	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Flat cards: a plain fill, no shadow. The border copies the floating doodles' stroke
+   (2px, faint) on the inside of the edge and follows --color-ink, so night cards get the
+   doodles' light line and day cards a matching faint dark one.
+   A noise mask varies the ink along the line (lighter stretches, small thin spots, dry
+   texture) so it reads like a pen line, without bending its shape. */
+.panel::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	/* grey on white reads fainter than light on dark, so day cards get a stronger line */
+	border: 2px solid color-mix(in srgb, var(--color-ink) var(--card-line, 38%), transparent);
+	border-radius: inherit;
+	mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.06' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  2.4 0 0 0 -0.55'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>") 0 0 / 300px 300px;
+	pointer-events: none;
+	transition: border-color 0.3s ease;
+}
+
+/* a smidge of paper grain over the whole card, text included; grey noise at low alpha
+   reads on both day and night cards */
+.panel::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 0.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+	pointer-events: none;
+}
+
+/* Night mode for one card: tokens are redefined for that card only, so everything
+   inside that uses them (chips, tiles, sort menu, lines) follows. .night is set by the
+   script in Layout.astro (card under the mouse, or the focused card on touch/narrow).
+   An open dropdown's menu floats outside the card, so the card also stays night while it's open. */
+.panel.night,
+.panel:has(select:open) {
+	--color-surface: #2b2b33;
+	--color-ink: #ededf2;
+	--color-muted: rgba(237, 237, 242, 0.65);
+	--border-card: 1.5px solid rgba(255, 255, 255, 0.12);
+	--card-line: 22%;
+}
+
+@media (hover: hover) {
+	/* big yellow hand-drawn arrow over the night card; hotspot (4 3) is the tip */
+	.panel.night,
+	.panel:has(select:open) {
+		cursor: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Cpath d="M4.5 3 Q4 17 5.5 31 Q8.5 27.5 12 24.5 Q15 30.5 18.5 36 Q21 35.2 23.5 33.8 Q20 28 17.2 22.3 Q22.6 22.6 28.5 21.8 Q16 12 4.5 3 Z" fill="%23ffc94d" stroke="%2317171c" stroke-width="2" stroke-linejoin="round"/%3E%3Cpath d="M6 5 Q5.6 17 6.8 28.5 M13 25.8 Q16 31 19 35 M18.5 23.6 Q23 23.4 26.5 22.6" fill="none" stroke="%2317171c" stroke-width="1" stroke-linecap="round" opacity="0.55"/%3E%3C/svg%3E') 4 3, auto;
+	}
+
+	/* matching hand-drawn pointing hand over anything clickable; hotspot (16 3) is the fingertip.
+	   select.chip option is listed so this outranks its own cursor rule in index.astro. */
+	:is(.panel.night, .panel:has(select:open)) :is(a, button, select, summary, select.chip option) {
+		cursor: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Cpath d="M13 6.5 Q12.8 3 16 3 Q19.2 3 19 6.5 L19.2 17 Q19.5 14.8 22.2 15 Q25 15.3 25 18 Q25.3 16 28 16.2 Q31 16.5 30.8 19.2 Q31.4 17.6 33.6 18 Q36 18.6 35.8 21.5 L35.2 29 Q34.3 36.2 27 37 L19.5 37 Q14.2 36.6 11 32.2 L5.2 24.5 Q3.6 21.8 5.6 20.6 Q7.6 19.6 9.6 21.6 L13.2 25.2 Z" fill="%23ffc94d" stroke="%2317171c" stroke-width="2" stroke-linejoin="round"/%3E%3Cpath d="M19.2 17 Q19.4 20 19 22.5 M25 18 Q25.2 20.5 24.8 22.8 M30.8 19.2 Q31 21.2 30.6 23.2 M14.4 7 Q14.2 14 14.6 22" fill="none" stroke="%2317171c" stroke-width="1" stroke-linecap="round" opacity="0.55"/%3E%3C/svg%3E') 16 3, pointer;
+	}
+}
+
+/* Outlines for small UI pieces. Each element draws its outline and fill on a ::before behind
+   its content. States change these instead of border/background: --sk-line outline colour,
+   --sk-w outline width, --sk-fill background, --sk-dash a dashed overlay (hover/focus). */
+:where(.chip, select.chip option, .tile, .writing-list li, .expertise li, .back) {
+	position: relative;
+	isolation: isolate;
+}
+
+:where(.chip, select.chip option, .tile, .writing-list li, .expertise li, .back)::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border: var(--sk-w, 1px) solid var(--sk-line, transparent);
+	border-radius: inherit;
+	background: var(--sk-dash, none) border-box 0 0 / 100% 100% no-repeat, var(--sk-fill, transparent);
+	pointer-events: none;
+	transition: border-color 0.15s ease, background-color 0.3s ease;
+}
+
+/* round back-to-home button on project and writing pages */
+.back {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	border-radius: 999px;
+	background: none;
+	border: 1.5px solid transparent;
+	--sk-fill: var(--color-surface);
+	--sk-line: color-mix(in srgb, var(--color-ink) 22%, transparent);
+	--sk-w: 1.5px;
+	font-size: 1.25rem;
+	text-decoration: none;
+}
+
+.back:hover {
+	--sk-line: transparent;
+	--sk-dash: var(--dash-pill);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.back {
+		transition: transform 0.15s ease;
+	}
+
+	.back:hover {
+		transform: translateX(-3px);
+	}
 }
 
 .pill {
@@ -111,7 +228,6 @@ img {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.panel,
 	.pill {
 		transition: transform 0.15s ease, border-color 0.15s ease;
 	}

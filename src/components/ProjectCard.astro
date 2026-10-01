@@ -12,6 +12,8 @@ const href = `${import.meta.env.BASE_URL}projects/${project.id}/`;
 const accents = ['var(--color-blue)', 'var(--color-coral)', 'var(--color-periwinkle)'];
 const tileColor = accents[index % accents.length];
 const initial = project.data.title.charAt(0).toUpperCase();
+const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+
 ---
 
 <a
@@ -19,7 +21,8 @@ const initial = project.data.title.charAt(0).toUpperCase();
 	class="tile"
 	data-title={project.data.title}
 	data-date={project.data.date.toISOString()}
-	data-category={project.data.category}
+	data-category={project.data.category.join(' ')}
+	data-org={project.data.organisation}
 >
 	{
 		project.data.image ? (
@@ -31,6 +34,7 @@ const initial = project.data.title.charAt(0).toUpperCase();
 		)
 	}
 	<span class="title">{project.data.title}</span>
+	<span class="meta">{project.data.organisation && <span class="org">{project.data.organisation}</span>}{date}</span>
 </a>
 
 <style>
@@ -40,7 +44,9 @@ const initial = project.data.title.charAt(0).toUpperCase();
 		gap: 0.6rem;
 		padding: 1rem;
 		border-radius: var(--radius-md);
-		border: var(--border-card);
+		border: 1.5px solid transparent;
+		--sk-line: color-mix(in srgb, var(--color-ink) 22%, transparent);
+		--sk-w: 1.5px;
 		text-decoration: none;
 		color: var(--color-ink);
 	}
@@ -66,14 +72,67 @@ const initial = project.data.title.charAt(0).toUpperCase();
 		overflow-wrap: break-word;
 	}
 
+	/* details (organisation · date): always in list view; on cards unless only a category
+	   filter is applied. The organisation is dropped once one is picked (it's the same for all). */
+	.meta {
+		display: none;
+		flex: none;
+		font-size: 0.8rem;
+		color: var(--color-muted);
+	}
+
+	:global(.gallery:not(.cat-filtered)) .meta,
+	:global(.gallery.org-filtered) .meta {
+		display: block;
+	}
+
+	.org::after {
+		content: ' · ';
+	}
+
+	:global(.gallery.org-filtered) .org {
+		display: none;
+	}
+
+	/* list view (more than 6 visible tiles, see .gallery in index.astro): compact rows with details */
+	:global(.gallery:has(> :nth-child(7 of :not(.is-hidden)))) .tile {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		gap: 0.15rem 0.75rem;
+		padding: 0.6rem 0.9rem;
+	}
+
+	:global(.gallery:has(> :nth-child(7 of :not(.is-hidden)))) .avatar {
+		width: 2.25rem;
+		height: 2.25rem;
+		flex: none;
+		font-size: 1rem;
+		border-radius: 0.6rem;
+	}
+
+	:global(.gallery:has(> :nth-child(7 of :not(.is-hidden)))) .meta {
+		display: block;
+	}
+
 	/* narrow gallery (mobile, ~1 column): a big square icon per row wastes space,
 	   switch to a compact horizontal row instead */
 	@container gallery (max-width: 26rem) {
+		/* icon left, title with details under it */
 		.tile {
-			flex-direction: row;
+			display: grid;
+			grid-template-columns: auto 1fr;
 			align-items: center;
-			gap: 0.75rem;
+			gap: 0.15rem 0.75rem;
 			padding: 0.75rem;
+		}
+
+		.avatar {
+			grid-row: span 2;
+		}
+
+		.meta {
+			grid-column: 2;
 		}
 
 		.avatar {
@@ -85,13 +144,16 @@ const initial = project.data.title.charAt(0).toUpperCase();
 		}
 	}
 
-	.tile:hover {
-		border-color: var(--color-ink);
+	.tile:hover,
+	.tile:focus-visible {
+		--sk-line: transparent;
+		--sk-dash: var(--dash-box);
+		outline: none;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
 		.tile {
-			transition: transform 0.15s ease, border-color 0.15s ease;
+			transition: transform 0.15s ease;
 		}
 
 		.tile:hover {

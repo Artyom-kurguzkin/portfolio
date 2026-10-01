@@ -1,0 +1,64 @@
+---
+// Line doodles drifting behind the page content. Layout is pre-generated and saved in
+// doodles.json (no same shape within 2 cells); regenerate with  node scripts/gen-doodles.ts
+import { shapes } from './doodle-shapes';
+import doodles from './doodles.json';
+
+// Each shape becomes a self-contained SVG image with the wobble filter baked in.
+// As an <img> it's rasterized once and then only moved; a live SVG filter on this many
+// animated elements re-runs every frame (measured 23fps vs 61fps).
+const toImage = (d: string) =>
+	'data:image/svg+xml,' +
+	encodeURIComponent(
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 56 56">` +
+			`<filter id="w"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3"/>` +
+			`<feDisplacementMap in="SourceGraphic" scale="2.5"/></filter>` +
+			`<path d="${d}" filter="url(#w)" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+	);
+const images = Object.fromEntries(Object.entries(shapes).map(([name, d]) => [name, toImage(d)]));
+---
+
+<div class="doodles" aria-hidden="true">
+	{
+		doodles.map((d) => (
+			<img
+				src={images[d.shape]}
+				alt=""
+				style={`left:${d.left}px;top:${d.top}px;width:${d.size}rem;--r:${d.rotate}deg;--t:${d.t}s;--delay:${d.delay}s;--dx:${d.dx}px;--dy:${d.dy}px`}
+			/>
+		))
+	}
+</div>
+
+<style>
+	.doodles {
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		overflow: hidden;
+		pointer-events: none;
+	}
+
+	img {
+		position: absolute;
+		height: auto;
+		transform: rotate(var(--r));
+	}
+
+	img {
+		animation: drift var(--t) ease-in-out var(--delay) infinite alternate;
+	}
+
+	/* slow background drift is gentle enough to keep under reduced motion, just at half speed */
+	@media (prefers-reduced-motion: reduce) {
+		img {
+			animation-duration: calc(var(--t) * 2);
+		}
+	}
+
+	@keyframes drift {
+		to {
+			transform: translate(var(--dx), var(--dy)) rotate(calc(var(--r) + 25deg));
+		}
+	}
+</style>

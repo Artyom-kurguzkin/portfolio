@@ -1,0 +1,44 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+// only posts hosted here get a page; ones with an external `link` open that site instead
+export async function getStaticPaths() {
+	const writings = await getCollection('writings', (post) => !post.data.link);
+	return writings.map((post) => ({
+		params: { slug: post.id },
+		props: { post },
+	}));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+
+<Layout title={post.data.title} description={post.data.summary}>
+	<a class="back" href={`${import.meta.env.BASE_URL}`} aria-label="Back to main page">&larr;</a>
+
+	<article class="panel">
+		<time datetime={post.data.date.toISOString()}>{date}</time>
+		<h1>{post.data.title}</h1>
+		{post.data.summary && <p class="summary">{post.data.summary}</p>}
+		<Content />
+	</article>
+</Layout>
+
+<style>
+	time {
+		font-size: 0.85rem;
+		color: var(--color-muted);
+	}
+
+	h1 {
+		color: var(--color-coral);
+		margin-top: 0.5rem;
+	}
+
+	.summary {
+		color: var(--color-muted);
+	}
+</style>

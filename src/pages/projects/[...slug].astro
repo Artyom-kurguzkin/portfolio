@@ -29,7 +29,7 @@ const tints = ['var(--tint-blue)', 'var(--tint-coral)', 'var(--tint-periwinkle)'
 				/>
 			)
 		}
-		<span class="pill category" style="background:var(--color-blue)">{project.data.category}</span>
+		{project.data.category.map((c) => <span class="pill category" style="background:var(--color-blue)">{c}</span>)}
 		<h1>{project.data.title}</h1>
 		<p class="summary">{project.data.summary}</p>
 		{
@@ -57,33 +57,6 @@ const tints = ['var(--tint-blue)', 'var(--tint-coral)', 'var(--tint-periwinkle)'
 </Layout>
 
 <style>
-	.back {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 2.75rem;
-		height: 2.75rem;
-		border-radius: 999px;
-		background: var(--color-surface);
-		border: var(--border-card);
-		font-size: 1.25rem;
-		text-decoration: none;
-	}
-
-	.back:hover {
-		border-color: var(--color-ink);
-	}
-
-	@media (prefers-reduced-motion: no-preference) {
-		.back {
-			transition: transform 0.15s ease, border-color 0.15s ease;
-		}
-
-		.back:hover {
-			transform: translateX(-3px);
-		}
-	}
-
 	.cover {
 		width: 100%;
 		max-height: 16rem;
@@ -95,7 +68,7 @@ const tints = ['var(--tint-blue)', 'var(--tint-coral)', 'var(--tint-periwinkle)'
 	.category {
 		color: #fff;
 		font-weight: 700;
-		margin-bottom: 0.75rem;
+		margin: 0 0.3rem 0.75rem 0;
 	}
 
 	h1 {
