@@ -45,7 +45,7 @@ const { title, description = 'Portfolio site.' } = Astro.props;
 			let pointer: { x: number; y: number } | null = null;
 			const update = () => {
 				if (!focusMode.matches)
-					return setNight(pointer && document.elementFromPoint(pointer.x, pointer.y)?.closest('.panel'));
+					return setNight((pointer && document.elementFromPoint(pointer.x, pointer.y)?.closest('.panel')) ?? null);
 				const half = innerHeight / 2;
 				const toBottom = document.documentElement.scrollHeight - innerHeight - scrollY;
 				const line = Math.min(half, scrollY) + Math.max(0, half - toBottom);
