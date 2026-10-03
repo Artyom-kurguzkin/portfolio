@@ -9,8 +9,9 @@ interface Props {
 const { project, index = 0 } = Astro.props;
 const href = `${import.meta.env.BASE_URL}projects/${project.id}/`;
 
-const accents = ['var(--color-blue)', 'var(--color-coral)', 'var(--color-periwinkle)'];
-const tileColor = accents[index % accents.length];
+// avatar fill + letter colour (yellow is too light for a white letter)
+const accents = ['background:var(--color-blue)', 'background:var(--color-green)', 'background:var(--color-yellow);color:var(--color-ink)'];
+const tileStyle = accents[index % accents.length];
 const initial = project.data.title.charAt(0).toUpperCase();
 const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 
@@ -28,7 +29,7 @@ const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', yea
 		project.data.image ? (
 			<img class="avatar" src={`${import.meta.env.BASE_URL}${project.data.image.replace(/^\//, '')}`} alt="" />
 		) : (
-			<span class="avatar" style={`background:${tileColor}`}>
+			<span class="avatar" style={tileStyle}>
 				{initial}
 			</span>
 		)

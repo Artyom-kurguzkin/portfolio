@@ -33,40 +33,5 @@ const { title, description = 'Portfolio site.' } = Astro.props;
 			<slot />
 		</main>
 		<Footer />
-		<script>
-			// Night mode goes to one card at a time, chosen here rather than with CSS :hover,
-			// because Chrome doesn't update :hover until scrolling stops.
-			// - mouse on a wide screen: the card under the pointer, re-checked every scroll frame
-			// - touch or narrow screen: the card under a "focus line" mid-screen (it slides to the
-			//   top/bottom edge near the page ends so the first and last cards get a turn), or the card just tapped
-			const focusMode = matchMedia('(hover: none), (max-width: 39.99rem)');
-			const panels = [...document.querySelectorAll<HTMLElement>('.panel')];
-			const setNight = (card: Element | null) => panels.forEach((p) => p.classList.toggle('night', p === card));
-			let pointer: { x: number; y: number } | null = null;
-			const update = () => {
-				if (!focusMode.matches)
-					return setNight((pointer && document.elementFromPoint(pointer.x, pointer.y)?.closest('.panel')) ?? null);
-				const half = innerHeight / 2;
-				const toBottom = document.documentElement.scrollHeight - innerHeight - scrollY;
-				const line = Math.min(half, scrollY) + Math.max(0, half - toBottom);
-				setNight(panels.findLast((p) => p.getBoundingClientRect().top <= line) ?? panels[0]);
-			};
-			let queued = false;
-			const schedule = () => {
-				if (!queued) requestAnimationFrame(() => ((queued = false), update()));
-				queued = true;
-			};
-			addEventListener('scroll', schedule, { passive: true });
-			addEventListener('resize', schedule);
-			focusMode.addEventListener('change', schedule);
-			addEventListener('pointermove', (e) => {
-				if (e.pointerType !== 'mouse') return;
-				pointer = { x: e.clientX, y: e.clientY };
-				schedule();
-			});
-			document.documentElement.addEventListener('pointerleave', () => ((pointer = null), schedule()));
-			panels.forEach((p) => p.addEventListener('pointerdown', () => focusMode.matches && setNight(p)));
-			update();
-		</script>
 	</body>
 </html>

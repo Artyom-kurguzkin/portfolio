@@ -5,7 +5,6 @@ import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import { Content as AboutContent } from '../data/about.md';
 import { Content as ContactContent } from '../data/contact.md';
-import { Content as ExpertiseContent } from '../data/expertise.md';
 
 const projects = (await getCollection('projects')).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
@@ -19,41 +18,23 @@ const writings = (await getCollection('writings')).sort(
 	<div class="board">
 		<div class="panel about">
 			<AboutContent />
+			<div class="contact">
+				<ContactContent />
+			</div>
 		</div>
 
-		<div class="panel contact">
-			<h2>Contact</h2>
-			<ContactContent />
-		</div>
-
-		<details class="panel fold expertise">
-			<summary><h2>Areas of Expertise</h2></summary>
-			<ExpertiseContent />
-		</details>
-		<!-- inline so it's open before first paint on wider screens; stays folded on mobile -->
-		<script is:inline>
-			if (matchMedia('(min-width: 40rem)').matches) document.querySelector('.expertise').open = true;
-		</script>
 
 		<div class="panel projects">
 			<h2>
-				Projects <span class="pill count" style="background:var(--color-blue)">{projects.length}</span>
+				Projects <span class="pill count" style="background:var(--color-green)">{projects.length}</span>
 			</h2>
 
 			<div class="controls">
 				<div class="filters" role="group" aria-label="Filter by category">
-					<!-- "All" is also the sort menu: clicking it shows every project and opens the
-					     sort order. The <button> child sets the label (customizable select, Chromium). -->
-					<select id="sort" class="chip active" data-filter="all" aria-label="All projects, sort order">
-						<button>All</button>
-						<option value="date-desc">Newest</option>
-						<option value="date-asc">Oldest</option>
-						<option value="title-asc">Title A–Z</option>
-					</select>
 					<!-- the button label is swapped to the chosen organisation by the script below -->
 					<select id="org" class="chip" aria-label="Filter by organisation">
 						<button>Organisation</button>
-						<option value="">All organisations</option>
+						<option value="">All</option>
 						{ORGANISATIONS.map((org) => <option value={org}>{org}</option>)}
 					</select>
 					{
@@ -73,7 +54,7 @@ const writings = (await getCollection('writings')).sort(
 
 		<div class="panel writings">
 			<h2>
-				Writings <span class="pill count" style="background:var(--color-coral)">{writings.length}</span>
+				Writings <span class="pill count" style="background:var(--color-yellow);color:var(--color-ink)">{writings.length}</span>
 			</h2>
 			<ul class="writing-list">
 				{
@@ -96,9 +77,45 @@ const writings = (await getCollection('writings')).sort(
 </Layout>
 
 <script>
+	// "Hi, I'm Artyom 😊": every symbol gets its own colour, never the same as its neighbours,
+	// re-picked every 2s. Symbols are split across 4 timers that start OFFSET_MS apart.
+	const PALETTE = ['var(--color-blue)', 'var(--color-green)', 'var(--color-yellow)'];
+	const PERIOD_MS = 2000;
+	const OFFSET_MS = 25; // ponytail: 25ms reads as simultaneous; PERIOD_MS / 4 spreads the groups evenly
+	const heading = document.querySelector<HTMLElement>('.about h1')!;
+	heading.setAttribute('aria-label', heading.textContent!.trim());
+	for (const node of [...heading.childNodes]) {
+		if (node.nodeType !== Node.TEXT_NODE) continue;
+		const letters = [...node.textContent!].map((ch) => {
+			const span = document.createElement('span');
+			span.textContent = ch;
+			if (ch.trim()) span.className = 'sym';
+			return span;
+		});
+		node.replaceWith(...letters);
+	}
+	heading.querySelector('svg')?.classList.add('sym');
+	const symbols = [...heading.querySelectorAll<HTMLElement | SVGElement>('.sym')];
+	symbols.forEach((s, i) => {
+		s.setAttribute('aria-hidden', 'true');
+		// trickle: each symbol's fade starts a beat after the one before it
+		s.style.transitionDelay = `${i * 30}ms`;
+	});
+
+	const recolor = (i: number) => {
+		const taken = [symbols[i - 1], symbols[i + 1]].map((s) => s?.style.color);
+		const options = PALETTE.filter((c) => c !== symbols[i].style.color && !taken.includes(c));
+		// both neighbours may already hold the other two colours: then keep the current one this round
+		if (options.length) symbols[i].style.color = options[Math.floor(Math.random() * options.length)];
+	};
+	symbols.forEach((_, i) => recolor(i));
+	for (let group = 0; group < 4; group++) {
+		const members = symbols.map((_, i) => i).filter((i) => i % 4 === group);
+		setTimeout(() => setInterval(() => members.forEach(recolor), PERIOD_MS), group * OFFSET_MS);
+	}
+
 	const gallery = document.getElementById('gallery')!;
 	const chips = document.querySelectorAll<HTMLElement>('.chip[data-filter]');
-	const sortSelect = document.getElementById('sort') as HTMLSelectElement;
 	const orgSelect = document.getElementById('org') as HTMLSelectElement;
 
 	function applyFilter() {
@@ -114,19 +131,6 @@ const writings = (await getCollection('writings')).sort(
 		}
 	}
 
-	function applySort() {
-		const [key, dir] = sortSelect.value.split('-');
-		const tiles = [...gallery.children] as HTMLElement[];
-		tiles.sort((a, b) => {
-			const cmp =
-				key === 'date'
-					? new Date(a.dataset.date ?? 0).getTime() - new Date(b.dataset.date ?? 0).getTime()
-					: (a.dataset.title ?? '').localeCompare(b.dataset.title ?? '');
-			return dir === 'desc' ? -cmp : cmp;
-		});
-		tiles.forEach((tile) => gallery.append(tile));
-	}
-
 	function setOrg(org: string) {
 		orgSelect.value = org;
 		orgSelect.querySelector('button')!.textContent = org || 'Organisation';
@@ -134,7 +138,7 @@ const writings = (await getCollection('writings')).sort(
 		applyFilter();
 	}
 
-	// "All" resets only the category; a chosen organisation stays (clear it via "All organisations")
+	// at most one category; 'all' (no chip active) shows every category
 	function setFilter(category: string) {
 		chips.forEach((c) => c.classList.toggle('active', c.dataset.filter === category));
 		applyFilter();
@@ -143,22 +147,8 @@ const writings = (await getCollection('writings')).sort(
 	orgSelect.addEventListener('change', () => setOrg(orgSelect.value));
 
 	chips.forEach((chip) => {
-		chip.addEventListener('click', () => setFilter(chip.dataset.filter!));
-	});
-
-	// expertise links are written as [**Area**](#filter-Category) in expertise.md
-	document.querySelector('.expertise')!.addEventListener('click', (e) => {
-		const link = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#filter-"]');
-		if (!link) return;
-		e.preventDefault();
-		setFilter(link.hash.slice('#filter-'.length));
-		gallery.focus();
-	});
-
-	// picking a sort order from the All menu also means "show all"
-	sortSelect.addEventListener('change', () => {
-		setFilter('all');
-		applySort();
+		// clicking the selected category again deselects it
+		chip.addEventListener('click', () => setFilter(chip.classList.contains('active') ? 'all' : chip.dataset.filter!));
 	});
 </script>
 
@@ -171,32 +161,28 @@ const writings = (await getCollection('writings')).sort(
 		grid-template-columns: 1fr;
 		grid-template-areas:
 			'about'
-			'contact'
-			'expertise'
 			'projects'
 			'writings';
 	}
 
-	/* tablet: About beside Contact; long Expertise gets a full row */
+	/* tablet: About on top */
 	@media (min-width: 40rem) {
 		.board {
 			grid-template-columns: 1fr 1fr;
 			grid-template-areas:
-				'about contact'
-				'expertise expertise'
+				'about about'
 				'projects projects'
 				'writings writings';
 		}
 	}
 
-	/* desktop: About is the lead block beside Contact */
+	/* desktop: About is a full-width lead block */
 	@media (min-width: 60rem) {
 		.board {
 			max-width: 68rem;
 			grid-template-columns: 1fr 1fr 1fr;
 			grid-template-areas:
-				'about about contact'
-				'expertise expertise expertise'
+				'about about about'
 				'projects projects writings';
 		}
 	}
@@ -211,7 +197,18 @@ const writings = (await getCollection('writings')).sort(
 	}
 
 	.about :global(h1) {
-		color: var(--color-coral);
+		color: var(--color-blue);
+	}
+
+	/* per-symbol colours are set by the script above; a short fade, staggered left to right */
+	.about :global(.sym) {
+		transition: color 0.12s ease-in-out;
+	}
+
+	/* thin dark outline on the greeting's letters (not the smiley); keeps yellow readable */
+	.about :global(span.sym) {
+		-webkit-text-stroke: 1px var(--color-ink);
+		paint-order: stroke fill;
 	}
 
 	/* drawn 😊 (an emoji glyph can't be recoloured); currentColor keeps it the heading's colour */
@@ -226,17 +223,16 @@ const writings = (await getCollection('writings')).sort(
 		stroke-linejoin: round;
 	}
 
+	/* contact sits at the bottom of the About card */
 	.contact {
-		grid-area: contact;
-	}
-
-	.contact h2 {
-		color: var(--color-periwinkle);
+		margin-top: 1.5rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
 	/* label above value: one left edge for every row, and the long email never wraps under a label */
 	.contact :global(dl) {
-		margin: 1rem 0 0;
+		margin: 0;
 	}
 
 	/* small bold caps in the card's text colour, so the labels read as designed, not default */
@@ -258,110 +254,19 @@ const writings = (await getCollection('writings')).sort(
 		margin-bottom: 0;
 	}
 
-	.expertise {
-		grid-area: expertise;
-	}
+	/* wide: each label/value pair side by side in a row */
+	@media (min-width: 40rem) {
+		.contact :global(dl) {
+			display: grid;
+			grid-auto-flow: column;
+			grid-template-rows: auto auto;
+			justify-content: start;
+			column-gap: 3rem;
+		}
 
-	.expertise h2 {
-		color: var(--color-blue);
-	}
-
-	.expertise :global(ul) {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
-		gap: 0 2.5rem;
-		padding-left: 1.1rem;
-		margin: 0.5rem 0 0;
-	}
-
-	.expertise :global(li) {
-		margin-bottom: 0.4rem;
-	}
-
-	.expertise :global(li p) {
-		margin: 0;
-	}
-
-	.fold summary {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		cursor: pointer;
-		list-style: none;
-	}
-
-	.fold summary::-webkit-details-marker {
-		display: none;
-	}
-
-	.fold summary h2 {
-		margin: 0;
-	}
-
-	.fold summary::after {
-		content: '';
-		flex: none;
-		width: 0.85rem;
-		height: 0.85rem;
-		margin-right: 0.35rem;
-		border-right: 3.5px solid currentColor;
-		border-bottom: 3.5px solid currentColor;
-		border-radius: 2px;
-		transform: translateY(-25%) rotate(45deg);
-	}
-
-	.fold[open] summary::after {
-		transform: translateY(25%) rotate(-135deg);
-	}
-
-	.fold summary:hover::after {
-		color: var(--color-green);
-	}
-
-	.fold summary::after {
-		transition: color 0.15s ease, transform 0.25s ease;
-	}
-
-	/* hover nudges the chevron in the direction it will move */
-	.fold:not([open]) summary:hover::after {
-		transform: translateY(0) rotate(45deg);
-	}
-
-	.fold[open] summary:hover::after {
-		transform: translateY(0) rotate(-135deg);
-	}
-
-	.fold[open] summary {
-		margin-bottom: 0.5rem;
-	}
-
-	/* whole item is the click target: stretch the link over its <li> */
-	.expertise :global(li) {
-		position: relative;
-		padding: 0.35rem 0.5rem;
-		border-radius: var(--radius-md);
-		cursor: pointer;
-	}
-
-	.expertise :global(li a) {
-		text-decoration: none;
-	}
-
-	.expertise :global(li a::after) {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: var(--radius-md);
-	}
-
-	.expertise :global(li:hover),
-	.expertise :global(li:has(a:focus-visible)) {
-		--sk-line: transparent;
-		--sk-dash: var(--dash-box);
-	}
-
-	.expertise :global(li a:focus-visible) {
-		outline: none;
+		.contact :global(dd) {
+			margin-bottom: 0;
+		}
 	}
 
 	.projects {
@@ -369,7 +274,7 @@ const writings = (await getCollection('writings')).sort(
 	}
 
 	.projects h2 {
-		color: var(--color-periwinkle);
+		color: var(--color-green);
 	}
 
 	.writings {
@@ -377,7 +282,7 @@ const writings = (await getCollection('writings')).sort(
 	}
 
 	.writings h2 {
-		color: var(--color-coral);
+		color: var(--color-blue);
 	}
 
 	h2 {
@@ -528,7 +433,7 @@ const writings = (await getCollection('writings')).sort(
 		margin: 1rem 0 0;
 	}
 
-	/* whole row is the click target, same as expertise items */
+	/* whole row is the click target */
 	.writing-list li {
 		position: relative;
 		padding: 0.75rem;

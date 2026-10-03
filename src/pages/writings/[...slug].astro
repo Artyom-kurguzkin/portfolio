@@ -27,14 +27,40 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 	</article>
 </Layout>
 
+<script>
+	// a YouTube link alone on its own line becomes an embedded player (commentary stays as written around it)
+	const YT = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/;
+	for (const a of document.querySelectorAll<HTMLAnchorElement>('article p > a:only-child')) {
+		const id = a.href.match(YT)?.[1];
+		if (!id || a.parentElement!.textContent!.trim() !== a.textContent!.trim()) continue;
+		const frame = document.createElement('iframe');
+		frame.src = `https://www.youtube-nocookie.com/embed/${id}`;
+		frame.title = a.textContent!;
+		frame.loading = 'lazy';
+		frame.allow = 'encrypted-media; picture-in-picture; fullscreen';
+		frame.className = 'video';
+		a.parentElement!.replaceWith(frame);
+	}
+</script>
+
 <style>
+	article :global(.video) {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: 16 / 9;
+		border: 0;
+		border-radius: var(--radius-md);
+		margin: 1rem 0;
+	}
+
 	time {
 		font-size: 0.85rem;
 		color: var(--color-muted);
 	}
 
 	h1 {
-		color: var(--color-coral);
+		color: var(--color-blue);
 		margin-top: 0.5rem;
 	}
 

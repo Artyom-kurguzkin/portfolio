@@ -16,7 +16,13 @@ const projects = defineCollection({
 		organisation: z.enum(ORGANISATIONS).optional(),
 		stack: z.array(z.string()).default([]),
 		link: z.url().optional(),
+		// hero + gallery thumbnail, a path under public/ (e.g. /img/foo.png)
 		image: z.string().optional(),
+		// project page hero (all optional): recurring themes shown as #tags, your role,
+		// and the outside-in context paragraph that opens the page
+		themes: z.array(z.string()).default([]),
+		role: z.string().optional(),
+		context: z.string().optional(),
 		date: z.coerce.date(),
 	}),
 });

@@ -12,79 +12,201 @@ export async function getStaticPaths() {
 
 const { project } = Astro.props;
 const { Content } = await render(project);
+const p = project.data;
 
-const tints = ['var(--tint-blue)', 'var(--tint-coral)', 'var(--tint-periwinkle)'];
+const date = p.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+// facts table under the hero text; rows without a value are skipped
+const facts: [string, string | undefined][] = [
+	['Date', date],
+	['Organisation', p.organisation],
+	['Type', p.category.join(', ')],
+	['Role', p.role],
+	['Stack', p.stack.join(', ') || undefined],
+];
 ---
 
-<Layout title={project.data.title} description={project.data.summary}>
+<Layout title={p.title} description={p.summary}>
 	<a class="back" href={`${import.meta.env.BASE_URL}`} aria-label="Back to main page">&larr;</a>
 
-	<div class="panel">
-		{
-			project.data.image && (
-				<img
-					class="cover"
-					src={`${import.meta.env.BASE_URL}${project.data.image.replace(/^\//, '')}`}
-					alt=""
-				/>
-			)
-		}
-		{project.data.category.map((c) => <span class="pill category" style="background:var(--color-blue)">{c}</span>)}
-		<h1>{project.data.title}</h1>
-		<p class="summary">{project.data.summary}</p>
-		{
-			project.data.stack.length > 0 && (
-				<ul class="stack">
-					{project.data.stack.map((tech, i) => (
-						<li class="pill" style={`background:${tints[i % tints.length]}`}>
-							{tech}
-						</li>
-					))}
-				</ul>
-			)
-		}
-		{
-			project.data.link && (
-				<p>
-					<a class="pill" href={project.data.link} style="background:var(--color-yellow)">
-						{project.data.link}
-					</a>
-				</p>
-			)
-		}
-		<Content />
-	</div>
+	<!-- Layout follows local design notes: context first, core ideas, challenge → approach,
+	     modules piece by piece, outcome last. Hero is built from front matter, the rest from the body. -->
+	<article class="panel project">
+		<header class="hero">
+			<div class="hero-text">
+				{p.themes.length > 0 && <p class="themes">{p.themes.map((t) => `#${t}`).join('  ')}</p>}
+				<h1>{p.title}</h1>
+				<p class="tagline">{p.summary}</p>
+				{p.context && <p class="context">{p.context}</p>}
+				<dl class="facts">
+					{
+						facts
+							.filter(([, v]) => v)
+							.map(([k, v]) => (
+								<>
+									<dt>{k}</dt>
+									<dd>{v}</dd>
+								</>
+							))
+					}
+					{
+						p.link && (
+							<>
+								<dt>Link</dt>
+								<dd>
+									<a href={p.link}>{p.link.replace(/^https?:\/\//, '')}</a>
+								</dd>
+							</>
+						)
+					}
+				</dl>
+			</div>
+			{p.image && <img class="hero-image" src={`${import.meta.env.BASE_URL}${p.image.replace(/^\//, '')}`} alt="" />}
+		</header>
+
+		<div class="body">
+			<Content />
+		</div>
+	</article>
 </Layout>
 
 <style>
-	.cover {
-		width: 100%;
-		max-height: 16rem;
-		object-fit: cover;
-		border-radius: var(--radius-md);
-		margin-bottom: 1.25rem;
+	.project {
+		max-width: 68rem;
 	}
 
-	.category {
-		color: #fff;
+	/* --- hero: text + facts beside the image on wide screens --- */
+	.hero {
+		display: grid;
+		gap: 2rem;
+		align-items: center;
+		padding-bottom: 2rem;
+		border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+	}
+
+	@media (min-width: 60rem) {
+		.hero:has(.hero-image) {
+			grid-template-columns: 1fr 1.1fr;
+		}
+	}
+
+	.themes {
+		margin: 0 0 0.75rem;
+		font-size: 0.8rem;
 		font-weight: 700;
-		margin: 0 0.3rem 0.75rem 0;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-muted);
+		white-space: pre-wrap;
 	}
 
 	h1 {
 		color: var(--color-blue);
+		margin-bottom: 0.25rem;
 	}
 
-	.summary {
+	.tagline {
+		margin: 0 0 1.25rem;
+		font-size: 1.15rem;
+		font-weight: 700;
+	}
+
+	.context {
+		margin: 0 0 1.5rem;
+	}
+
+	.facts {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 0.3rem 1.25rem;
+		margin: 0;
+		padding-left: 0.9rem;
+		border-left: 3px solid var(--color-ink);
+		font-size: 0.85rem;
+	}
+
+	.facts dt {
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.facts dd {
+		margin: 0;
+		color: var(--color-muted);
+		overflow-wrap: anywhere;
+	}
+
+	.hero-image {
+		width: 100%;
+		border-radius: var(--radius-md);
+	}
+
+	/* --- body: written in the project's markdown --- */
+	.body {
+		max-width: 46rem;
+	}
+
+	/* section titles: Core ideas, Challenge, Approach, How it works, Outcome */
+	.body :global(h2) {
+		margin: 2.75rem 0 0.75rem;
+		color: var(--color-green);
+	}
+
+	/* small arrow labels for each idea / module, like caption headings in a print spread */
+	.body :global(h3) {
+		margin: 1.75rem 0 0.35rem;
+		font-family: var(--font-body);
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.body :global(h3)::before {
+		content: '→ ';
+		color: var(--color-green);
+	}
+
+	/* a list straight under a section title becomes highlight cards (Core ideas) */
+	.body :global(h2 + ul) {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+		gap: 0.75rem;
+		padding: 0;
+		list-style: none;
+	}
+
+	.body :global(h2 + ul li) {
+		padding: 1rem;
+		border: 1.5px solid color-mix(in srgb, var(--color-ink) 22%, transparent);
+		border-radius: var(--radius-md);
+	}
+
+	.body :global(h2 + ul li strong) {
+		display: block;
+		margin-bottom: 0.25rem;
+		color: var(--color-ink);
+	}
+
+	/* images run wider than the text column; an italic line right after is the caption */
+	.body :global(img) {
+		display: block;
+		width: 100%;
+		height: auto;
+		border-radius: var(--radius-md);
+		margin: 1.25rem 0 0.5rem;
+	}
+
+	.body :global(p:has(> img) + p > em:only-child) {
+		display: block;
+		font-size: 0.85rem;
 		color: var(--color-muted);
 	}
 
-	.stack {
-		list-style: none;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		padding: 0;
-		margin: 0.75rem 0;
+	@media (min-width: 60rem) {
+		.body :global(p:has(> img)) {
+			width: calc(100% + 16rem);
+			max-width: calc(68rem - 2 * 2.5rem);
+		}
 	}
 </style>

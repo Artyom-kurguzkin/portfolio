@@ -4,10 +4,11 @@ summary: A running list of videos that stuck with me, and why.
 date: 2026-10-02
 ---
 
-<!-- Copy the block below for each video. -->
+<!-- Copy the block below for each video. Put the YouTube link alone on its own line
+     (copy it from YouTube's Share button); the page turns it into a player. -->
 
 ## Video title
 
-[Watch on YouTube](https://www.youtube.com/watch?v=VIDEO_ID)
+[Video title](https://www.youtube.com/watch?v=VIDEO_ID)
 
-What it's about in a sentence or two, and what it made me think about.
+Your commentary: what it's about, and what it made you think about.
