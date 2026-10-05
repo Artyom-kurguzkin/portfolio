@@ -230,43 +230,9 @@ const writings = (await getCollection('writings')).sort(
 		border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
-	/* label above value: one left edge for every row, and the long email never wraps under a label */
-	.contact :global(dl) {
+	.contact :global(p) {
 		margin: 0;
-	}
-
-	/* small bold caps in the card's text colour, so the labels read as designed, not default */
-	.contact :global(dt) {
-		font-size: 0.75rem;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--color-ink);
-		margin-bottom: 0.15rem;
-	}
-
-	.contact :global(dd) {
-		margin: 0 0 0.85rem;
 		overflow-wrap: anywhere;
-	}
-
-	.contact :global(dd:last-child) {
-		margin-bottom: 0;
-	}
-
-	/* wide: each label/value pair side by side in a row */
-	@media (min-width: 40rem) {
-		.contact :global(dl) {
-			display: grid;
-			grid-auto-flow: column;
-			grid-template-rows: auto auto;
-			justify-content: start;
-			column-gap: 3rem;
-		}
-
-		.contact :global(dd) {
-			margin-bottom: 0;
-		}
 	}
 
 	.projects {
