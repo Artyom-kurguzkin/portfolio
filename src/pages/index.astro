@@ -78,9 +78,9 @@ const writings = (await getCollection('writings')).sort(
 
 <script>
 	// "Hi, I'm Artyom 😊": every symbol gets its own colour, never the same as its neighbours,
-	// re-picked every 2s. Symbols are split across 4 timers that start OFFSET_MS apart.
+	// re-picked every PERIOD_MS. Symbols are split across 4 timers that start OFFSET_MS apart.
 	const PALETTE = ['var(--color-blue)', 'var(--color-green)', 'var(--color-yellow)'];
-	const PERIOD_MS = 2000;
+	const PERIOD_MS = 200;
 	const OFFSET_MS = 25; // ponytail: 25ms reads as simultaneous; PERIOD_MS / 4 spreads the groups evenly
 	const heading = document.querySelector<HTMLElement>('.about h1')!;
 	heading.setAttribute('aria-label', heading.textContent!.trim());
@@ -96,11 +96,7 @@ const writings = (await getCollection('writings')).sort(
 	}
 	heading.querySelector('svg')?.classList.add('sym');
 	const symbols = [...heading.querySelectorAll<HTMLElement | SVGElement>('.sym')];
-	symbols.forEach((s, i) => {
-		s.setAttribute('aria-hidden', 'true');
-		// trickle: each symbol's fade starts a beat after the one before it
-		s.style.transitionDelay = `${i * 30}ms`;
-	});
+	symbols.forEach((s) => s.setAttribute('aria-hidden', 'true'));
 
 	const recolor = (i: number) => {
 		const taken = [symbols[i - 1], symbols[i + 1]].map((s) => s?.style.color);
@@ -200,9 +196,9 @@ const writings = (await getCollection('writings')).sort(
 		color: var(--color-blue);
 	}
 
-	/* per-symbol colours are set by the script above; a short fade, staggered left to right */
+	/* per-symbol colours are set by the script above; a short fade */
 	.about :global(.sym) {
-		transition: color 0.12s ease-in-out;
+		transition: color 0.08s ease-in-out;
 	}
 
 	/* thin dark outline on the greeting's letters (not the smiley); keeps yellow readable */

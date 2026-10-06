@@ -251,6 +251,14 @@ const facts: [string, string | undefined][] = [
 		}
 	}
 
+	/* code blocks (Shiki, dark theme) */
+	.body :global(pre) {
+		padding: 1rem 1.25rem;
+		border-radius: var(--radius-md);
+		font-size: 0.85rem;
+		line-height: 1.5;
+	}
+
 	/* images and videos; an italic line right after is the caption */
 	.body :global(video) {
 		display: block;
