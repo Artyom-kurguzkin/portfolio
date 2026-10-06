@@ -18,10 +18,8 @@ const date = p.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric'
 // facts table under the hero text; rows without a value are skipped
 const facts: [string, string | undefined][] = [
 	['Date', date],
-	['Organisation', p.organisation],
-	['Type', p.category.join(', ')],
 	['Role', p.role],
-	['Stack', p.stack.join(', ') || undefined],
+	['Contributors', p.contributors.join(', ') || undefined],
 ];
 ---
 
@@ -33,37 +31,44 @@ const facts: [string, string | undefined][] = [
 	<article class="panel project">
 		<header class="hero">
 			<div class="hero-text">
-				{p.themes.length > 0 && <p class="themes">{p.themes.map((t) => `#${t}`).join('  ')}</p>}
-				<h1>{p.title}</h1>
-				<p class="tagline">{p.summary}</p>
-				{p.context && <p class="context">{p.context}</p>}
 				<dl class="facts">
 					{
 						facts
 							.filter(([, v]) => v)
 							.map(([k, v]) => (
-								<>
+								<div>
 									<dt>{k}</dt>
 									<dd>{v}</dd>
-								</>
+								</div>
 							))
 					}
 					{
 						p.link && (
-							<>
+							<div>
 								<dt>Link</dt>
 								<dd>
 									<a href={p.link}>{p.link.replace(/^https?:\/\//, '')}</a>
 								</dd>
-							</>
+							</div>
 						)
 					}
 				</dl>
+				<h1>{p.title}</h1>
+				<p class="tagline">{p.summary}</p>
+				{p.context && <p class="context">{p.context}</p>}
 			</div>
 			{p.image && <img class="hero-image" src={`${import.meta.env.BASE_URL}${p.image.replace(/^\//, '')}`} alt="" />}
 		</header>
 
 		<div class="body">
+			{
+				p.stack.length > 0 && (
+					<section class="tools">
+						<h2>Applied tools</h2>
+						<p>{p.stack.join('; ')}</p>
+					</section>
+				)
+			}
 			<Content />
 		</div>
 	</article>
@@ -71,32 +76,55 @@ const facts: [string, string | undefined][] = [
 
 <style>
 	.project {
+		--pad: clamp(1.25rem, 5vw, 2.5rem); /* same as .panel padding; the hero image bleeds by it */
 		max-width: 68rem;
 	}
 
-	/* --- hero: text + facts beside the image on wide screens --- */
+	/* --- hero --- */
 	.hero {
-		display: grid;
-		gap: 2rem;
-		align-items: center;
+		display: flex;
+		flex-direction: column;
 		padding-bottom: 2rem;
 		border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
-	@media (min-width: 60rem) {
-		.hero:has(.hero-image) {
-			grid-template-columns: 1fr 1.1fr;
-		}
+	/* narrow: the image is a cover across the top of the card, edge to edge */
+	.hero-image {
+		order: -1;
+		width: calc(100% + 2 * var(--pad));
+		max-width: none;
+		margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 1.5rem;
+		aspect-ratio: 4 / 3;
+		object-fit: cover;
+		object-position: center top;
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 	}
 
-	.themes {
-		margin: 0 0 0.75rem;
-		font-size: 0.8rem;
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--color-muted);
-		white-space: pre-wrap;
+	/* wide: text left, image fills the card's top-right corner to its edges */
+	@media (min-width: 60rem) {
+		.hero:has(.hero-image) {
+			display: grid;
+			grid-template-columns: 1.15fr 1fr;
+			gap: 2.5rem;
+			margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 0 0;
+			padding-bottom: 0;
+			border-bottom: none;
+		}
+
+		.hero:has(.hero-image) .hero-text {
+			align-self: center;
+			padding: var(--pad) 0 2rem;
+		}
+
+		.hero-image {
+			order: 0;
+			width: 100%;
+			height: 100%;
+			min-height: 34rem;
+			margin: 0;
+			aspect-ratio: auto;
+			border-radius: 0 var(--radius-lg) 0 var(--radius-md);
+		}
 	}
 
 	h1 {
@@ -114,17 +142,24 @@ const facts: [string, string | undefined][] = [
 		margin: 0 0 1.5rem;
 	}
 
+	/* facts: one wrapping row of "LABEL value" pairs above the title */
 	.facts {
-		display: grid;
-		grid-template-columns: max-content 1fr;
-		gap: 0.3rem 1.25rem;
-		margin: 0;
-		padding-left: 0.9rem;
-		border-left: 3px solid var(--color-ink);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 1.75rem;
+		margin: 0 0 1.5rem;
 		font-size: 0.85rem;
 	}
 
+	.facts div {
+		display: flex;
+		gap: 0.5rem;
+		align-items: baseline;
+		min-width: 0;
+	}
+
 	.facts dt {
+		font-size: 0.75rem;
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
@@ -136,16 +171,7 @@ const facts: [string, string | undefined][] = [
 		overflow-wrap: anywhere;
 	}
 
-	.hero-image {
-		width: 100%;
-		border-radius: var(--radius-md);
-	}
-
-	/* --- body: written in the project's markdown --- */
-	.body {
-		max-width: 46rem;
-	}
-
+	/* --- body: written in the project's markdown, full card width --- */
 	/* section titles: Core ideas, Challenge, Approach, How it works, Outcome */
 	.body :global(h2) {
 		margin: 2.75rem 0 0.75rem;
@@ -167,46 +193,63 @@ const facts: [string, string | undefined][] = [
 		color: var(--color-green);
 	}
 
-	/* a list straight under a section title becomes highlight cards (Core ideas) */
-	.body :global(h2 + ul) {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
-		gap: 0.75rem;
+	/* a list straight under a section title whose items start with **Term** (Core ideas):
+	   term in a left column, explanation beside it, thin rule between rows */
+	.body > :global(h2 + ul) {
 		padding: 0;
 		list-style: none;
 	}
 
-	.body :global(h2 + ul li) {
-		padding: 1rem;
-		border: 1.5px solid color-mix(in srgb, var(--color-ink) 22%, transparent);
-		border-radius: var(--radius-md);
+	.body > :global(h2 + ul li) {
+		position: relative;
+		padding: 0.75rem 0;
+		border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
-	.body :global(h2 + ul li strong) {
+	.body > :global(h2 + ul li strong:first-child) {
 		display: block;
-		margin-bottom: 0.25rem;
 		color: var(--color-ink);
 	}
 
-	/* images run wider than the text column; an italic line right after is the caption */
-	.body :global(img) {
+	@media (min-width: 40rem) {
+		.body > :global(h2 + ul li:has(> strong:first-child)) {
+			padding-left: 15rem;
+		}
+
+		.body > :global(h2 + ul li strong:first-child) {
+			position: absolute;
+			left: 0;
+			width: 14rem;
+		}
+	}
+
+	/* images and videos; an italic line right after is the caption */
+	.body :global(video) {
 		display: block;
 		width: 100%;
+		max-width: 40rem;
+		max-height: 70vh;
+		border-radius: var(--radius-md);
+		margin: 1.25rem auto 0.5rem;
+		background: #000;
+	}
+
+	/* tall images (diagrams) are capped to the screen height and centred instead of filling the width */
+	.body :global(img) {
+		display: block;
+		width: auto;
+		max-width: 100%;
+		max-height: 80vh;
+		margin-inline: auto !important;
 		height: auto;
 		border-radius: var(--radius-md);
 		margin: 1.25rem 0 0.5rem;
 	}
 
-	.body :global(p:has(> img) + p > em:only-child) {
+	.body :global(:is(p:has(> img), video) + p > em:only-child) {
 		display: block;
 		font-size: 0.85rem;
 		color: var(--color-muted);
 	}
 
-	@media (min-width: 60rem) {
-		.body :global(p:has(> img)) {
-			width: calc(100% + 16rem);
-			max-width: calc(68rem - 2 * 2.5rem);
-		}
-	}
 </style>

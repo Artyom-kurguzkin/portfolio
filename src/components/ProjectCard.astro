@@ -26,8 +26,8 @@ const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', yea
 	data-org={project.data.organisation}
 >
 	{
-		project.data.image ? (
-			<img class="avatar" src={`${import.meta.env.BASE_URL}${project.data.image.replace(/^\//, '')}`} alt="" />
+		project.data.thumb ? (
+			<img class="avatar" src={`${import.meta.env.BASE_URL}${project.data.thumb.replace(/^\//, '')}`} alt="" loading="lazy" />
 		) : (
 			<span class="avatar" style={tileStyle}>
 				{initial}

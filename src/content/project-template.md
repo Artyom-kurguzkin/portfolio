@@ -3,7 +3,6 @@
 title: Project Template
 summary: Short title, short description. One line that says what it is.
 category: Web
-themes: [Accessibility, Internal tools, Data]
 role: Full-stack developer
 stack: [Astro, TypeScript]
 image: /img/placeholder.svg
@@ -17,7 +16,7 @@ context: >-
 ## Core ideas
 
 - **First idea** The concept the whole project hangs on, in a sentence.
-- **Second idea** A recurring theme; mirror it in the #themes above.
+- **Second idea** A recurring theme across the project.
 - **Third idea** What makes this different from the obvious approach.
 
 ## Challenge

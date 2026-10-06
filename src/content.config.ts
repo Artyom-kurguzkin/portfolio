@@ -16,12 +16,13 @@ const projects = defineCollection({
 		organisation: z.enum(ORGANISATIONS).optional(),
 		stack: z.array(z.string()).default([]),
 		link: z.url().optional(),
-		// hero + gallery thumbnail, a path under public/ (e.g. /img/foo.png)
+		// project page hero image, a path under public/ (e.g. /img/foo.webp)
 		image: z.string().optional(),
-		// project page hero (all optional): recurring themes shown as #tags, your role,
-		// and the outside-in context paragraph that opens the page
-		themes: z.array(z.string()).default([]),
+		// small square for the gallery tile (falls back to the coloured letter)
+		thumb: z.string().optional(),
+		// project page hero (all optional): your role and the outside-in context paragraph
 		role: z.string().optional(),
+		contributors: z.array(z.string()).default([]),
 		context: z.string().optional(),
 		date: z.coerce.date(),
 	}),
