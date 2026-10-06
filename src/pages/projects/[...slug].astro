@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
+import SectionCards from '../../components/SectionCards.astro';
 
 export async function getStaticPaths() {
 	const projects = await getCollection('projects');
@@ -22,6 +23,7 @@ const facts: [string, string | undefined][] = [
 	['Date', date],
 	['Role', p.role],
 	['Contributors', p.contributors.join(', ') || undefined],
+	['Tools', p.stack.join('; ') || undefined],
 ];
 ---
 
@@ -30,64 +32,59 @@ const facts: [string, string | undefined][] = [
 
 	<!-- Layout follows local design notes: context first, core ideas, challenge → approach,
 	     modules piece by piece, outcome last. Hero is built from front matter, the rest from the body. -->
-	<article class="panel project">
-		<header class="hero">
-			<div class="hero-text">
-				<dl class="facts">
-					{
-						facts
-							.filter(([, v]) => v)
-							.map(([k, v]) => (
+	<!-- separate cards, like the main page, laid out by SectionCards: the overview (hero beside
+	     Core ideas), then Challenges and the rest of the markdown in rows of cards -->
+	<article class="board">
+		<SectionCards>
+			<header slot="hero" class="panel hero">
+				<div class="hero-text">
+					<dl class="facts">
+						{
+							facts
+								.filter(([, v]) => v)
+								.map(([k, v]) => (
+									<div>
+										<dt>{k}</dt>
+										<dd>{v}</dd>
+									</div>
+								))
+						}
+						{
+							p.link && (
 								<div>
-									<dt>{k}</dt>
-									<dd>{v}</dd>
+									<dt>Link</dt>
+									<dd>
+										<a href={p.link}>{p.link.replace(/^https?:\/\//, '')}</a>
+									</dd>
 								</div>
-							))
-					}
-					{
-						p.link && (
-							<div>
-								<dt>Link</dt>
-								<dd>
-									<a href={p.link}>{p.link.replace(/^https?:\/\//, '')}</a>
-								</dd>
-							</div>
-						)
-					}
-				</dl>
-				<h1>{p.title}</h1>
-				<p class="tagline">{p.summary}</p>
-				{p.context && <p class="context">{p.context}</p>}
-			</div>
-			{
-				p.video ? (
-					<video
-						class="hero-image"
-						src={url(p.video)}
-						poster={p.image && url(p.image)}
-						autoplay
-						muted
-						loop
-						playsinline
-						aria-hidden="true"
-					/>
-				) : (
-					p.image && <img class="hero-image" src={url(p.image)} alt="" />
-				)
-			}
-		</header>
-
-		<div class="body">
-			{
-				p.stack.length > 0 && (
-					<section class="tools">
-						<h2>Applied tools</h2>
-						<p>{p.stack.join('; ')}</p>
-					</section>
-				)
-			}
+							)
+						}
+					</dl>
+					<h1>{p.title}</h1>
+					<p class="tagline">{p.summary}</p>
+					{p.context && <p class="context">{p.context}</p>}
+				</div>
+				{
+					p.video ? (
+						<video
+							class="hero-image"
+							src={url(p.video)}
+							poster={p.image && url(p.image)}
+							autoplay
+							muted
+							loop
+							playsinline
+							aria-hidden="true"
+						/>
+					) : (
+						p.image && <img class="hero-image" src={url(p.image)} alt="" />
+					)
+				}
+				{(p.video || p.image) && <span class="zoom-badge" aria-hidden="true" />}
+			</header>
+	
 			<Content />
-		</div>
+		</SectionCards>
 	</article>
 </Layout>
 
@@ -100,20 +97,653 @@ const facts: [string, string | undefined][] = [
 		start();
 		clip.addEventListener('canplay', start, { once: true });
 	}
+
+	// Justified fit inside a card, so nothing leaves empty space beside or under it:
+	// - side by side, when some text width w makes the text exactly as tall as the pictures
+	//   scaled to fill the rest of the card's width (code blocks keep their size)
+	// - otherwise (short text next to wide pictures can never be that tall) the text runs
+	//   across the top and the pictures form one row below, all the same height, filling the
+	//   card's width
+	// Pictures never grow past MAX_H. Re-run on resize and as pictures load.
+	const MAX_H = 560;
+	const MIN_TEXT = 288; // 18rem
+	const wide = matchMedia('(min-width: 60rem)');
+	const balance = (card: HTMLElement) => {
+		const text = card.querySelector<HTMLElement>(':scope > .item.text')!;
+		const items = [...card.children] as HTMLElement[];
+		card.classList.remove('stacked');
+		items.forEach((el) => {
+			el.style.flex = '';
+			el.style.maxWidth = '';
+		});
+		if (!wide.matches) return;
+		const pics = items.filter((el) => el !== text && el.querySelector('img, video'));
+		const code = items.filter((el) => el !== text && !pics.includes(el));
+		if (!pics.length) return; // text beside code: the estimate from SectionCards holds
+		const media = (el: HTMLElement) => el.querySelector<HTMLImageElement & HTMLVideoElement>('img, video')!;
+		const ratio = (el: HTMLElement) => {
+			const m = media(el);
+			return (m.naturalWidth || m.videoWidth || 16) / (m.naturalHeight || m.videoHeight || 9);
+		};
+		const ratios = pics.map(ratio);
+		const sumRatio = ratios.reduce((a, b) => a + b, 0);
+		const caption = Math.max(...pics.map((el) => el.offsetHeight - media(el).offsetHeight));
+		const gap = parseFloat(getComputedStyle(card).columnGap) || 0;
+		const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) * 2;
+		const codeWidth = code.reduce((sum, el) => sum + el.offsetWidth + gap, 0);
+		const setPics = (h: number) =>
+			pics.forEach((el, i) => {
+				el.style.flex = `0 0 ${h * ratios[i]}px`;
+				el.style.maxWidth = 'none';
+			});
+
+		// side by side: pictures get room - w, so their height is (room - w) / sumRatio
+		const room = inner - codeWidth - gap * pics.length;
+		let best: { w: number; h: number } | undefined;
+		for (let w = MIN_TEXT; w <= room - 120 * pics.length; w += 8) {
+			text.style.flex = `0 0 ${w}px`;
+			const h = (room - w) / sumRatio;
+			if (h > MAX_H) continue;
+			if (text.offsetHeight <= h + caption) {
+				best = { w, h };
+				break; // narrowest text that fits beside: the biggest pictures
+			}
+		}
+		// accept only when the text comes out about as tall as the pictures
+		if (best && best.h >= 200) {
+			text.style.flex = `0 0 ${best.w}px`;
+			if (text.offsetHeight >= 0.8 * (best.h + caption)) {
+				setPics(best.h);
+				return true;
+			}
+		}
+
+		// stacked: text (and any code beside it) across the top, then one row of pictures
+		// filling the width
+		const rowHeight = Math.min(MAX_H, (inner - gap * (pics.length - 1)) / sumRatio);
+		const rowWidth = rowHeight * sumRatio + gap * (pics.length - 1);
+		if (rowHeight === MAX_H) {
+			// the pictures can't fill the width: either way some space stays empty, so compare
+			// the strip beside the stacked pictures with the strip under the text beside them
+			const besideEmpty = (inner - rowWidth) * rowHeight;
+			const w = room - MAX_H * sumRatio;
+			if (w >= MIN_TEXT) {
+				text.style.flex = `0 0 ${w}px`;
+				const underEmpty = Math.max(0, MAX_H + caption - text.offsetHeight) * w;
+				if (underEmpty <= besideEmpty) {
+					setPics(MAX_H);
+					return underEmpty < 0.1 * (MAX_H + caption) * w; // fits unless a strip stays empty
+				}
+			}
+		}
+		card.classList.add('stacked');
+		text.style.flex = '1 1 0';
+		setPics(rowHeight);
+		// a single picture under the text simply spans the card (a video needs the width for its controls)
+		if (pics.length === 1 && rowHeight < MAX_H) pics[0].style.flex = '0 0 100%';
+		return rowHeight < MAX_H; // the pictures fill the width
+	};
+
+	// A picture card whose text is too short for its pictures leaves empty space whatever the
+	// layout, so it takes in a neighbouring card without pictures from the same section (its
+	// text and any code join the text column) and tries again.
+	const donorFor = (card: HTMLElement, el: Element | null) =>
+		el instanceof HTMLElement && !el.classList.contains('pics') && el.dataset.section === card.dataset.section ? el : null;
+	const fitPictures = (card: HTMLElement) => {
+		const text = card.querySelector<HTMLElement>(':scope > .item.text');
+		if (!text || card.children.length < 2) return true;
+		while (!balance(card)) {
+			const prev = donorFor(card, card.previousElementSibling);
+			const next = donorFor(card, card.nextElementSibling);
+			const donor = prev ?? next;
+			if (!donor) return false;
+			const html = [...donor.children].map((el) => el.innerHTML).join('');
+			text.innerHTML = donor === prev ? html + text.innerHTML : text.innerHTML + html;
+			donor.remove();
+		}
+		return true;
+	};
+	// Rows: a card with pictures takes a row of its own (fitted above); other cards go two to a
+	// row, and the two widths are chosen so both cards come out the same height: find the
+	// smallest height H both can reach within the row's width. Inside such a card, text sits
+	// beside its code block, or above it when the card is too narrow for both.
+	const layoutInner = (card: HTMLElement) => {
+		const text = card.querySelector<HTMLElement>(':scope > .item.text');
+		const code = [...card.children].filter((el) => el !== text) as HTMLElement[];
+		if (!text) return;
+		text.style.flex = '1 1 0';
+		code.forEach((el) => {
+			el.style.flex = '0 0 auto';
+			el.style.maxWidth = '100%';
+		});
+		if (!code.length) return;
+		card.classList.remove('stacked');
+		const gap = parseFloat(getComputedStyle(card).columnGap) || 0;
+		const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) * 2;
+		const codeWidth = code.reduce((sum, el) => sum + el.offsetWidth + gap, 0);
+		if (inner - codeWidth < MIN_TEXT) {
+			card.classList.add('stacked');
+			text.style.flex = '0 0 100%';
+		}
+	};
+	// measured with stretching off: a row stretches every card to its tallest one
+	const heightAt = (card: HTMLElement, w: number) => {
+		card.style.flex = `0 0 ${w}px`;
+		card.style.alignSelf = 'flex-start';
+		layoutInner(card);
+		const h = card.offsetHeight;
+		card.style.alignSelf = '';
+		return h;
+	};
+	// narrowest width at which the card is no taller than h
+	const widthFor = (card: HTMLElement, h: number, max: number) => {
+		if (heightAt(card, max) > h) return Infinity;
+		let lo = 320;
+		let hi = max;
+		for (let i = 0; i < 10; i++) {
+			const mid = (lo + hi) / 2;
+			if (heightAt(card, mid) > h) lo = mid;
+			else hi = mid;
+		}
+		return hi;
+	};
+	// Lays the row out at one shared height and returns the width it couldn't use: when some
+	// card can't get shorter (its code block holds it up), the others reach that height while
+	// still narrower than the row, and the rest would only be empty space.
+	const layoutRow = (row: HTMLElement[], full: number, gap: number) => {
+		const room = full - gap * (row.length - 1);
+		if (row.length === 1) {
+			row[0].style.flex = '1 1 100%';
+			layoutInner(row[0]);
+			return 0;
+		}
+		const max = room - 320 * (row.length - 1);
+		let lo = Math.max(...row.map((c) => heightAt(c, max)));
+		let hi = Math.max(...row.map((c) => heightAt(c, 320)));
+		for (let i = 0; i < 12; i++) {
+			const mid = (lo + hi) / 2;
+			const total = row.reduce((sum, c) => sum + widthFor(c, mid, max), 0);
+			if (total > room) lo = mid;
+			else hi = mid;
+		}
+		const widths = row.map((c) => widthFor(c, hi, max));
+		const spare = room - widths.reduce((a, b) => a + b, 0);
+		// any small leftover goes to a text-only card, which absorbs it with barely a change
+		const taker = Math.max(0, row.findIndex((c) => c.children.length === 1));
+		widths[taker] += spare;
+		row.forEach((c, i) => {
+			c.style.flex = `0 0 ${widths[i] - 0.5}px`;
+			layoutInner(c);
+		});
+		return spare;
+	};
+	// Cards keep their reading order in data-order, so columns can be taken apart again.
+	document.querySelectorAll('.flow > .card').forEach((c, i) => ((c as HTMLElement).dataset.order = String(i)));
+	const unwrap = (flow: HTMLElement) => {
+		flow.querySelectorAll(':scope > .col').forEach((col) => col.replaceWith(...col.children));
+		const cards = ([...flow.children] as HTMLElement[]).sort((a, b) => +a.dataset.order! - +b.dataset.order!);
+		flow.append(...cards);
+		return cards;
+	};
+	// After a row is laid out, its shorter columns still have room at the bottom: the next
+	// cards are stacked under the column with the most room, as long as each fits there (a
+	// little overflow is fine, it only stretches the others). Columns end at the row's bottom.
+	const STACK_SLACK = 200; // a card overflowing the gap by up to this much still goes in: a taller row beats an empty strip
+	const stackUnder = (row: HTMLElement[], rest: HTMLElement[], gap: number) => {
+		const cols = row.map((card) => {
+			const col = document.createElement('div');
+			col.className = 'col';
+			col.style.flex = card.style.flex;
+			card.style.flex = '0 0 auto';
+			card.before(col);
+			col.append(card);
+			return col;
+		});
+		const natural = (col: HTMLElement) =>
+			[...col.children].reduce((sum, el) => sum + (el as HTMLElement).offsetHeight, 0) + gap * (col.children.length - 1);
+		let taken = 0;
+		const fit = (card: HTMLElement) => (card.classList.contains('pics') ? balance(card) : layoutInner(card));
+		for (const card of rest) {
+			const heights = cols.map(natural);
+			const target = Math.max(...heights);
+			const i = heights.indexOf(Math.min(...heights));
+			const free = target - heights[i] - gap;
+			if (free < 120) break;
+			cols[i].append(card);
+			card.style.flex = '0 0 auto';
+			fit(card);
+			if (card.offsetHeight > free + STACK_SLACK) {
+				cols.at(-1)!.after(card); // doesn't fit: back to where it was
+				card.style.flex = card.classList.contains('pics') ? '1 1 100%' : '';
+				fit(card);
+				break;
+			}
+			taken++;
+		}
+		cols.forEach((col) => ((col.lastElementChild as HTMLElement).style.flex = '1 1 auto'));
+		return taken;
+	};
+	// height of a picture card fitted at width w (row stretching off)
+	const picsHeightAt = (card: HTMLElement, w: number) => {
+		card.style.flex = `0 0 ${w}px`;
+		card.style.alignSelf = 'flex-start';
+		balance(card);
+		const h = card.offsetHeight;
+		card.style.alignSelf = '';
+		return h;
+	};
+	// a text card beside a picture card that can't fill a row: split the width so both come out
+	// the same height (the text card gets taller as it narrows, the picture card shorter as it widens)
+	const pairWithPics = (text: HTMLElement, pics: HTMLElement, full: number, gap: number) => {
+		const room = full - gap;
+		let lo = 320;
+		let hi = Math.max(lo, room - 480);
+		for (let i = 0; i < 12; i++) {
+			const mid = (lo + hi) / 2;
+			if (heightAt(text, mid) > picsHeightAt(pics, room - mid)) lo = mid;
+			else hi = mid;
+		}
+		heightAt(text, hi);
+		picsHeightAt(pics, room - hi);
+	};
+	const layoutFlows = () => {
+		document.querySelectorAll<HTMLElement>('.flow').forEach((flow) => {
+			const all = unwrap(flow);
+			if (!wide.matches) {
+				all.forEach((c) => {
+					c.style.flex = '';
+					c.classList.remove('stacked');
+					[...c.children].forEach((el) => ((el as HTMLElement).style.flex = ''));
+				});
+				return;
+			}
+			const full = flow.clientWidth;
+			const gap = parseFloat(getComputedStyle(flow).columnGap) || 0;
+			const unfilled = new Set<HTMLElement>();
+			all.filter((c) => c.classList.contains('pics')).forEach((c) => {
+				if (!c.isConnected) return;
+				c.style.flex = '1 1 100%';
+				if (!fitPictures(c)) unfilled.add(c);
+			});
+			// rows of cards without pictures: start with two, and keep taking the next card while
+			// the row can't use its full width (and each card still gets at least 320px)
+			const maxPerRow = Math.max(1, Math.floor((full + gap) / (320 + gap)));
+			const cards = [...flow.children] as HTMLElement[];
+			let i = 0;
+			while (i < cards.length) {
+				if (cards[i].classList.contains('pics')) {
+					const card = cards[i++];
+					const next = cards[i];
+					// a picture card that can't fill a full row (its text is too short) narrows to its
+					// pictures plus a text column, and the following cards stack in the space beside it
+					if (unfilled.has(card) && next && !next.classList.contains('pics')) {
+						pairWithPics(next, card, full, gap);
+						i++;
+						i += stackUnder([card, next], cards.slice(i), gap);
+					}
+					continue;
+				}
+				// a card right before a picture card that can't fill a row: the picture card narrows
+				// and this card (and any that fit under it later) takes the space on its left
+				const after = cards[i + 1];
+				if (after && unfilled.has(after)) {
+					const card = cards[i];
+					pairWithPics(card, after, full, gap);
+					i += 2;
+					i += stackUnder([card, after], cards.slice(i), gap);
+					continue;
+				}
+				const row = [cards[i++]];
+				let spare = layoutRow(row, full, gap);
+				while (i < cards.length && !cards[i].classList.contains('pics') && row.length < maxPerRow) {
+					if (row.length >= 2 && spare < 40) break;
+					row.push(cards[i++]);
+					spare = layoutRow(row, full, gap);
+				}
+				if (row.length > 1) i += stackUnder(row, cards.slice(i), gap);
+			}
+		});
+	};
+	const balanceAll = layoutFlows;
+
+	// Zoom: click (or Enter) on a picture or code block opens it full screen. In there, a click on
+	// the picture toggles its actual size; a click anywhere else, or Escape, closes it.
+	const zoom = document.createElement('dialog');
+	zoom.className = 'zoom';
+	zoom.setAttribute('aria-label', 'Enlarged view');
+	document.body.append(zoom);
+	document.querySelectorAll<HTMLElement>('.board .hero-image, .board .card img, .board .card pre').forEach((el) => {
+		el.classList.add('zoomable');
+		el.tabIndex = 0;
+		el.removeAttribute('aria-hidden');
+		el.setAttribute('role', 'button');
+		const what = el.matches('.hero-image') ? 'project picture' : el.getAttribute('alt') || 'code';
+		el.setAttribute('aria-label', `Enlarge ${what}`);
+	});
+	const open = (el: HTMLElement) => {
+		const copy = el.cloneNode(true) as HTMLElement;
+		// a bare copy: the page's own classes, scoping attributes and sizes stay behind
+		[...copy.attributes]
+			.filter((a) => a.name.startsWith('data-astro') || ['class', 'style', 'tabindex', 'role', 'aria-label', 'loading'].includes(a.name))
+			.forEach((a) => copy.removeAttribute(a.name));
+		zoom.replaceChildren(copy);
+		zoom.showModal();
+		if (copy instanceof HTMLVideoElement) copy.play().catch(() => {});
+	};
+	document.addEventListener('click', (e) => {
+		const el = (e.target as Element).closest<HTMLElement>('.zoomable');
+		if (el) open(el);
+	});
+	document.addEventListener('keydown', (e) => {
+		const el = (e.target as Element).closest?.<HTMLElement>('.zoomable');
+		if (el && (e.key === 'Enter' || e.key === ' ')) {
+			e.preventDefault();
+			open(el);
+		}
+	});
+	zoom.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement;
+		if (target instanceof HTMLImageElement || target instanceof HTMLVideoElement) target.classList.toggle('actual');
+		else if (!target.closest('pre')) zoom.close();
+	});
+	let width = 0;
+	new ResizeObserver(([entry]) => {
+		if (entry.contentRect.width === width) return; // our own height changes don't need a re-run
+		width = entry.contentRect.width;
+		balanceAll();
+	}).observe(document.querySelector('.board')!);
+	document.querySelectorAll('.flow img').forEach((img) => img.addEventListener('load', balanceAll, { once: true }));
+	wide.addEventListener('change', balanceAll);
 </script>
 
 <style>
-	.project {
+	/* blocks top to bottom: the overview bento, Challenges, then the long-form rows */
+	.board {
 		--pad: clamp(1.25rem, 5vw, 2.5rem); /* same as .panel padding; the hero image bleeds by it */
+		--gap: 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap);
 		max-width: 68rem;
+		margin: clamp(1rem, 4vw, 2rem) auto;
 	}
+
+	@media (min-width: 96rem) {
+		.board {
+			max-width: min(120rem, 100% - 8rem); /* gutter clears the back button */
+		}
+	}
+
+	.board :global(.panel) {
+		margin: 0;
+		max-width: none;
+		min-width: 0;
+		container-type: inline-size; /* card content adapts to the card's width */
+	}
+
+	.board :global(.card > :first-child),
+	.board :global(.card .text > :first-child) {
+		margin-top: 0;
+	}
+
+	.board :global(.card > :last-child),
+	.board :global(.card :is(.text, .media) > :last-child) {
+		margin-bottom: 0;
+	}
+
+	/* --- overview: the hero beside one Core ideas card, its ideas in a grid inside --- */
+	.board :global(.overview) {
+		display: grid;
+		gap: var(--gap);
+	}
+
+	@media (min-width: 96rem) {
+		.board :global(.overview) {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.board :global(.ideas) {
+		display: grid;
+		gap: 0 2.5rem;
+		align-content: start;
+	}
+
+	@media (min-width: 40rem) {
+		.board :global(.ideas) {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		/* an odd last idea spans both columns, so the grid stays a clean rectangle */
+		.board :global(.ideas > .idea:last-child:nth-child(odd of .idea)) {
+			grid-column: 1 / -1;
+		}
+	}
+
+	/* ideas separated by thin rules, like the Challenges items */
+	.board :global(.idea) {
+		padding: 1rem 0;
+		border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+	}
+
+	@media (min-width: 40rem) {
+		.board :global(.ideas > .idea:nth-child(-n + 2 of .idea)) {
+			padding-top: 0;
+			border-top: none;
+		}
+	}
+
+	.board :global(.ideas > .idea:nth-child(1 of .idea)) {
+		padding-top: 0;
+		border-top: none;
+	}
+
+	.board :global(.ideas > .idea:last-child) {
+		padding-bottom: 0;
+	}
+
+	.board :global(.ideas > h2) {
+		grid-column: 1 / -1;
+		margin: 0 0 1rem;
+	}
+
+	.board :global(.idea h3) {
+		margin: 0 0 0.5rem;
+		color: var(--color-green);
+	}
+
+	.board :global(.idea h3::before) {
+		content: none;
+	}
+
+	.board :global(.idea p) {
+		margin: 0;
+	}
+
+	/* justified rows (SectionCards sets --grow and --basis from each card's content): cards
+	   wrap into rows that fill the width, growing in proportion so a row keeps one height */
+	.board :global(.flow) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: stretch; /* cards in a row share one height (the script sizes them to match) */
+		gap: var(--gap);
+	}
+
+	.board :global(.flow .card) {
+		flex: 1 1 100%;
+	}
+
+	/* a column inside a row: cards stacked under each other (set up by the script) */
+	.board :global(.flow > .col) {
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap);
+		min-width: 0;
+	}
+
+	/* inside a card, the text and each picture or code block are sized the same way */
+	.board :global(.flow .card) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 1.5rem 2.5rem;
+	}
+
+	.board :global(.card .item) {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+
+	@media (min-width: 60rem) {
+		.board :global(.flow .card),
+		.board :global(.card .item) {
+			flex: var(--grow) 1 var(--basis);
+		}
+
+		/* a card's text and pictures stay on one line: when they don't fit, they all shrink
+		   in proportion instead of wrapping and leaving an empty strip */
+		.board :global(.flow .card) {
+			flex-wrap: nowrap;
+		}
+
+		/* set by the fit script: text across the top, the pictures in one row below */
+		.board :global(.flow .card.stacked) {
+			flex-wrap: wrap;
+			justify-content: center;
+			align-items: flex-start;
+		}
+
+		.board :global(.card .item:first-child:not(:only-child)) {
+			min-width: 18rem;
+		}
+
+		/* code keeps its own width (lines don't wrap) and only shrinks, scrolling, if it must */
+		.board :global(.card .item:has(> pre)) {
+			max-width: 100%;
+		}
+	}
+
+	/* text starts at the top of its card; pictures and code sit centred beside it */
+	.board :global(.card .item:first-child) {
+		align-self: flex-start;
+	}
+
+	.board :global(.card .item > :first-child) {
+		margin-top: 0;
+	}
+
+	.board :global(.card .item > :last-child) {
+		margin-bottom: 0;
+	}
+
+	/* Challenges: one wide card; its items wrap and stretch so the last row fills too */
+	/* Challenges: items flow down balanced columns, so an odd one out never stretches across */
+	.board :global(.challenges .item > ul) {
+		columns: 4 18rem;
+		column-gap: 2.5rem;
+	}
+
+	.board :global(.challenges .item > ul > li) {
+		break-inside: avoid;
+	}
+
+	/* --- zoom: pictures and code open full screen on click (script above) --- */
+	.board :global(.zoomable:focus-visible) {
+		outline: 2px solid var(--color-yellow);
+		outline-offset: 2px;
+	}
+
+	/* a small magnifier badge shows on the item's corner (the hero gets a real element, since a
+	   .panel's ::before/::after already draw its border and grain) */
+	.board :global(.item:has(.zoomable)) {
+		position: relative;
+	}
+
+	.board :global(.item:has(.zoomable))::after,
+	.zoom-badge {
+		content: '';
+		position: absolute;
+		z-index: 1;
+		top: 0.6rem;
+		right: 0.6rem;
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		border: 1.5px solid #17171c;
+		background: var(--color-yellow)
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317171c' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6'/%3E%3Cpath d='M15 15l5 5M10.5 8v5M8 10.5h5'/%3E%3C/svg%3E")
+			center / 60% no-repeat;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.zoom-badge {
+		top: 1.25rem;
+		right: 1.25rem;
+	}
+
+	.board :global(.item:has(.zoomable:is(:hover, :focus-visible)))::after,
+	.hero:has(.hero-image:is(:hover, :focus-visible)) .zoom-badge {
+		opacity: 1;
+	}
+
+	:global(dialog.zoom) {
+		width: 100vw;
+		height: 100dvh;
+		max-width: none;
+		max-height: none;
+		margin: 0;
+		padding: 2rem;
+		border: 0;
+		background: transparent;
+		overflow: auto;
+		cursor: zoom-out;
+	}
+
+	:global(dialog.zoom[open]) {
+		display: flex;
+	}
+
+	:global(dialog.zoom::backdrop) {
+		background: rgb(12 12 16 / 0.88);
+		backdrop-filter: blur(4px);
+	}
+
+	/* margin: auto centres it, and still lets an oversized one scroll from its top-left */
+	:global(dialog.zoom > :is(img, video, pre)) {
+		margin: auto;
+		border-radius: var(--radius-md);
+	}
+
+	:global(dialog.zoom > :is(img, video)) {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+		background: #fff;
+		cursor: zoom-in;
+	}
+
+	/* clicked: the picture at its full resolution, scrolled around */
+	:global(dialog.zoom > .actual) {
+		max-width: none;
+		max-height: none;
+		cursor: zoom-out;
+	}
+
+	:global(dialog.zoom > pre) {
+		max-width: 100%;
+		padding: 1.5rem 2rem;
+		font-size: 1.1rem;
+		line-height: 1.6;
+		overflow: auto;
+		cursor: auto;
+	}
+
 
 	/* --- hero --- */
 	.hero {
 		display: flex;
 		flex-direction: column;
-		padding-bottom: 2rem;
-		border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
 	/* narrow: the image is a cover across the top of the card, edge to edge */
@@ -128,21 +758,19 @@ const facts: [string, string | undefined][] = [
 		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 	}
 
-	/* wide: text left, image fills the card's top-right corner to its edges */
+	/* wide: text left, image fills the card's whole right side to its edges */
 	@media (min-width: 60rem) {
 		.hero:has(.hero-image) {
 			display: grid;
 			grid-template-columns: 1.15fr 1fr;
 			gap: 2.5rem;
-			margin: calc(-1 * var(--pad)) calc(-1 * var(--pad)) 0 0;
-			padding-bottom: 0;
-			border-bottom: none;
+			padding: 0 0 0 var(--pad);
 		}
 
 		/* top-aligned: the facts row sits at the top of the card, as on pages without an image */
 		.hero:has(.hero-image) .hero-text {
 			align-self: start;
-			padding: var(--pad) 0 2rem;
+			padding: var(--pad) 0;
 		}
 
 		.hero-image {
@@ -152,7 +780,16 @@ const facts: [string, string | undefined][] = [
 			min-height: 34rem;
 			margin: 0;
 			aspect-ratio: auto;
-			border-radius: 0 var(--radius-lg) 0 var(--radius-md);
+			border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+		}
+	}
+
+	/* beside Core ideas: the image no longer sets the height, so the hero and the ideas card
+	   come out as tall as the taller of their texts, and neither has an empty strip */
+	@media (min-width: 96rem) {
+		.hero-image {
+			contain: size;
+			min-height: 22rem;
 		}
 	}
 
@@ -168,7 +805,7 @@ const facts: [string, string | undefined][] = [
 	}
 
 	.context {
-		margin: 0 0 1.5rem;
+		margin: 0;
 	}
 
 	/* facts: one wrapping row of "LABEL value" pairs above the title */
@@ -200,15 +837,18 @@ const facts: [string, string | undefined][] = [
 		overflow-wrap: anywhere;
 	}
 
-	/* --- body: written in the project's markdown, full card width --- */
-	/* section titles: Core ideas, Challenge, Approach, How it works, Outcome */
-	.body :global(h2) {
-		margin: 2.75rem 0 0.75rem;
+	/* --- sections: written in the project's markdown, laid out by SectionCards --- */
+	/* section titles (Core ideas, Challenge, Approach, How it works, Outcome), in cards and on bands */
+	.board :global(.panel h2) {
+		margin: 0 0 0.75rem;
+	}
+
+	.board :global(h2) {
 		color: var(--color-green);
 	}
 
 	/* small arrow labels for each idea / module, like caption headings in a print spread */
-	.body :global(h3) {
+	.board :global(h3) {
 		margin: 1.75rem 0 0.35rem;
 		font-family: var(--font-body);
 		font-size: 0.85rem;
@@ -217,35 +857,35 @@ const facts: [string, string | undefined][] = [
 		text-transform: uppercase;
 	}
 
-	.body :global(h3)::before {
+	.board :global(h3)::before {
 		content: '→ ';
 		color: var(--color-green);
 	}
 
 	/* a list straight under a section title whose items start with **Term** (Core ideas):
 	   term in a left column, explanation beside it, thin rule between rows */
-	.body > :global(h2 + ul) {
+	.board :global(.card .item > h2 + ul) {
 		padding: 0;
 		list-style: none;
 	}
 
-	.body > :global(h2 + ul li) {
+	.board :global(.card .item > h2 + ul li) {
 		position: relative;
 		padding: 0.75rem 0;
 		border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
 	}
 
-	.body > :global(h2 + ul li strong:first-child) {
+	.board :global(.card .item > h2 + ul li strong:first-child) {
 		display: block;
 		color: var(--color-ink);
 	}
 
-	@media (min-width: 40rem) {
-		.body > :global(h2 + ul li:has(> strong:first-child)) {
+	@container (min-width: 36rem) {
+		.board :global(.card:not(.challenges) .item > h2 + ul li:has(> strong:first-child)) {
 			padding-left: 15rem;
 		}
 
-		.body > :global(h2 + ul li strong:first-child) {
+		.board :global(.card:not(.challenges) .item > h2 + ul li strong:first-child) {
 			position: absolute;
 			left: 0;
 			width: 14rem;
@@ -253,7 +893,7 @@ const facts: [string, string | undefined][] = [
 	}
 
 	/* code blocks (Shiki, dark theme) */
-	.body :global(pre) {
+	.board :global(pre) {
 		padding: 1rem 1.25rem;
 		border-radius: var(--radius-md);
 		font-size: 0.85rem;
@@ -261,29 +901,25 @@ const facts: [string, string | undefined][] = [
 	}
 
 	/* images and videos; an italic line right after is the caption */
-	.body :global(video) {
+	.board :global(.card video) {
 		display: block;
 		width: 100%;
-		max-width: 40rem;
 		max-height: 70vh;
 		border-radius: var(--radius-md);
-		margin: 1.25rem auto 0.5rem;
+		margin: 0 0 0.5rem;
 		background: #000;
 	}
 
-	/* tall images (diagrams) are capped to the screen height and centred instead of filling the width */
-	.body :global(img) {
+	/* pictures fill their item; the item is sized by SectionCards and never wider than 60% of the picture's pixels */
+	.board :global(.card img) {
 		display: block;
-		width: auto;
-		max-width: 100%;
-		max-height: 80vh;
-		margin-inline: auto !important;
+		width: 100%;
 		height: auto;
 		border-radius: var(--radius-md);
-		margin: 1.25rem 0 0.5rem;
+		margin: 0 0 0.5rem;
 	}
 
-	.body :global(:is(p:has(> img), video) + p > em:only-child) {
+	.board :global(.card :is(p:has(> img), video) + p > em:only-child) {
 		display: block;
 		font-size: 0.85rem;
 		color: var(--color-muted);

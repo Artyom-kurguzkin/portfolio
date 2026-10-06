@@ -4,7 +4,7 @@ summary: An infrared remote control for the channel and volume counters on a sec
 category: Electronics
 organisation: Flinders
 date: 2025-09-19
-stack: [Flinduino (PIC32), C, Serial monitor]
+stack: [PIC32, C, IR LED, IR receiver, Buzzer, Potentiometer, Push buttons]
 image: /img/remote-hero.webp
 thumb: /img/remote-thumb.webp
 context: >-
@@ -17,6 +17,7 @@ context: >-
 - **Asynchronous communication** The two boards share no clock. The receiver has to pick out a message from the infrared signal on its own, using timing that both ends agree on in advance.
 - **Framing** Each message is a frame: a header that announces it, the data, and a trailer. Anything that doesn't fit the frame is ignored.
 - **Predefined codes** Every command is an 8-bit code known to both ends: one for each of volume down, volume up, channel down and channel up.
+- **Debouncing** A mechanical button bounces between on and off for a few milliseconds when pressed, so a single read can be wrong. Instead, each loop shifts the button's state into a history byte, and the button only counts as held once the whole byte is ones.
 - **State machine** The system is a loop of states with a critical path that always runs, and branches taken only when there's a message to send or receive.
 
 ## Approach

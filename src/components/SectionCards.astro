@@ -1,0 +1,146 @@
+---
+// Lays out a project page as an overview followed by rows of cards.
+//
+// The overview is the hero beside one Core ideas card (its ideas in a grid inside). The rest
+// flows as rows of cards: cards with pictures get a row each, the others share rows that the
+// page script sizes to one height. Every heading sits inside a card: a section with several
+// "### subsections" puts its title in its first card. A row never mixes one section's
+// subsection cards with standalone sections. The Challenge(s)/Setbacks section comes right
+// after the overview.
+const hero = await Astro.slots.render('hero');
+const html = await Astro.slots.render('default');
+
+type Section = { name: string; title: string; html: string; head: string; subs: string[] };
+const sections: Section[] = html
+	.split(/(?=<h2[\s>])/)
+	.filter((part) => part.trim())
+	.map((part) => {
+		const [head, ...subs] = part.split(/(?=<h3[\s>])/);
+		const title = head.match(/^\s*<h2[\s\S]*?<\/h2>/)?.[0] ?? '';
+		const name = title.replace(/<[^>]+>/g, '').trim();
+		return { name, title, html: part, head: head.slice(title.length), subs };
+	});
+
+const take = (test: RegExp) => {
+	const i = sections.findIndex((s) => test.test(s.name));
+	return i < 0 ? undefined : sections.splice(i, 1)[0];
+};
+
+// Core ideas: one bento cell per "**Term** explanation" item
+const core = take(/^core ideas$/i);
+const ideas = [...(core?.html.matchAll(/<li>\s*<strong>([\s\S]*?)<\/strong>([\s\S]*?)<\/li>/g) ?? [])].map(
+	([, term, text]) => ({ term, text: text.trim() })
+);
+const challenges = take(/^(challenges?|setbacks)$/i);
+
+// --- sizing: widths in px for a card of height H, from the page's type metrics ---
+const H = 440; // target row height
+const PAD = 40; // card padding (.panel, desktop)
+const GAP = 40; // between items inside a card
+const INNER = H - 2 * PAD;
+const MAX_H = 560; // tallest a picture may grow to
+const CHAR = 8.8; // Consolas at 16px
+const LINE = 24;
+const CODE_CHAR = 7.5; // code at 0.85rem
+
+const plain = (raw: string) => raw.replace(/<[^>]+>/g, '').trim();
+// width that lets this text fit in INNER px of height (headings and paragraph gaps cost height)
+const textWidth = (raw: string) => {
+	const fixed = (raw.match(/<h2/g)?.length ?? 0) * 56 + (raw.match(/<h3/g)?.length ?? 0) * 40 + (raw.match(/<(p|li)[\s>]/g)?.length ?? 0) * 16;
+	const room = Math.max(INNER - fixed, 120);
+	return Math.max(288, (plain(raw).length * CHAR * LINE) / room);
+};
+
+// pictures, videos and code blocks, each with the italic caption line that follows it
+const MEDIA =
+	/(?:<p>\s*<img[\s\S]*?<\/p>|(?:<p>\s*)?<video[\s\S]*?<\/video>(?:\s*<\/p>)?|<pre[\s\S]*?<\/pre>)(?:\s*<p>\s*<em>[\s\S]*?<\/em>\s*<\/p>)?/g;
+
+type Item = { html: string; width: number; grow: boolean; max?: number; text?: boolean };
+const mediaItem = (raw: string): Item => {
+	const w = Number(raw.match(/\swidth="(\d+)"/)?.[1]);
+	const h = Number(raw.match(/\sheight="(\d+)"/)?.[1]);
+	if (raw.trimStart().startsWith('<pre')) {
+		const lines = plain(raw).split('\n');
+		return { html: raw, width: Math.max(...lines.map((l) => l.length)) * CODE_CHAR + 40, grow: false };
+	}
+	if (w && h) {
+		// pictures are exported at ~2x: never shown wider than 60% of their pixels, nor taller
+		// than MAX_H (a portrait diagram growing with its row would dwarf the text beside it)
+		const max = Math.round(Math.min(w * 0.6, (MAX_H * w) / h));
+		return { html: raw, width: Math.min(((INNER - 40) * w) / h, max), grow: true, max };
+	}
+	if (raw.includes('<img')) return { html: raw, width: INNER, grow: true, max: MAX_H }; // remote picture, size unknown: treat as square
+	return { html: raw, width: INNER * (16 / 9), grow: true }; // video
+};
+
+type Card = { items: Item[]; width: number; pics: boolean; section?: number; challenges?: boolean };
+const card = (raw: string): Card => {
+	const media = (raw.match(MEDIA) ?? []).map(mediaItem);
+	const text = raw.replace(MEDIA, '');
+	const items: Item[] = [...(plain(text) ? [{ html: text, width: textWidth(text), grow: true, text: true }] : []), ...media];
+	const width = items.reduce((sum, i) => sum + i.width, 0) + GAP * (items.length - 1) + 2 * PAD;
+	return { items, width, pics: /<img|<video/.test(raw.match(MEDIA)?.join('') ?? '') };
+};
+
+type Block = { kind: 'flow'; cards: Card[] };
+const blocks: Block[] = [];
+let flowOpen = false; // one flow for all cards; the page script arranges them
+const add = (c: Card, section: number) => {
+	c.section = section;
+	const last = blocks.at(-1);
+	if (flowOpen && last?.kind === 'flow') last.cards.push(c);
+	else blocks.push({ kind: 'flow', cards: [c] });
+	flowOpen = true;
+};
+// Challenges opens the flow, so it can share space with the cards after it
+if (challenges) add({ ...card(challenges.html), challenges: true }, -1);
+for (const [i, s] of sections.entries()) {
+	if (s.subs.length < 2) add(card(s.html), i); // fits one card: title stays inside it
+	else {
+		// the section title goes inside its first card, never on the page background
+		const [first, ...rest] = plain(s.head) ? [s.head, ...s.subs] : s.subs;
+		add(card(s.title + first), i);
+		rest.forEach((sub) => add(card(sub), i));
+	}
+}
+
+// flex: grow in proportion to width so a row's cards keep their shares (and equal heights).
+// Grow is width / 100: grow factors adding up to less than 1 would leave part of a row empty.
+const flex = (width: number, grow: boolean) => `--grow:${grow ? (width / 100).toFixed(2) : 0};--basis:${Math.round(width)}px`;
+---
+
+<div class="overview">
+	<Fragment set:html={hero} />
+	{
+		ideas.length > 0 && (
+			<section class="panel ideas">
+				<Fragment set:html={core!.title} />
+				{ideas.map((idea) => (
+					<div class="idea">
+						<h3 set:html={idea.term} />
+						<p set:html={idea.text} />
+					</div>
+				))}
+			</section>
+		)
+	}
+</div>
+
+
+{
+	blocks.map((block) => (
+		<div class="flow">
+			{block.cards.map((c) => (
+				<section class:list={['panel', 'card', { pics: c.pics, challenges: c.challenges }]} data-section={c.section} style={flex(c.width, true)}>
+					{c.items.map((item) => (
+						<div
+							class:list={['item', { text: item.text }]}
+							style={`${flex(item.width, item.grow)}${item.max ? `;max-width:${item.max}px` : ''}`}
+							set:html={item.html}
+						/>
+					))}
+				</section>
+			))}
+		</div>
+	))
+}
