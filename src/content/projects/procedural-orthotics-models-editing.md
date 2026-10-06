@@ -9,7 +9,7 @@ stack: [Blender, Python (Blender API), PrusaSlicer]
 image: /img/orthotics-hero.webp
 thumb: /img/orthotics-thumb.webp
 context: >-
-  I contributed to this project while doing internship at Novita. The overal aimed was to decrease the cost of manufacturing orthotic devices by integrating additive manufacturing into the existing process or introducing a new one. My part was first to automate the already-defined modelling stage, done in Blender and PrusaSlicer on 3D-scanned body parts, and then to improve upon it.
+  I contributed to this project while doing internship at Novita. The overal aim was to decrease the cost of manufacturing orthotic devices by integrating additive manufacturing into the existing process or introducing a new one. My part was first to automate the already-defined modelling stage, done in Blender and PrusaSlicer on 3D-scanned body parts, and then to improve upon it.
 ---
 
 ## Core ideas

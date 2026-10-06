@@ -4,6 +4,7 @@ summary: An internal ERP and a volunteer HR system for CLCN, behind one Google W
 category: Web
 organisation: CLCN
 date: 2026-09-01
+contributors: [William Li, Rukun Qiao, Emma Yu, James McDonald, Andy Jia]
 stack: [React, TypeScript, Express, MySQL, Drizzle ORM, Docker, GCP Cloud Run, GitHub Actions, Google Workspace APIs]
 image: /img/erp-hero.webp
 thumb: /img/erp-thumb.webp
