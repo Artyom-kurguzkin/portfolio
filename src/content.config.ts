@@ -18,6 +18,8 @@ const projects = defineCollection({
 		link: z.url().optional(),
 		// project page hero image, a path under public/ (e.g. /img/foo.webp)
 		image: z.string().optional(),
+		// optional muted looping clip shown in the hero instead of `image` (which becomes its poster)
+		video: z.string().optional(),
 		// small square for the gallery tile (falls back to the coloured letter)
 		thumb: z.string().optional(),
 		// project page hero (all optional): your role and the outside-in context paragraph
