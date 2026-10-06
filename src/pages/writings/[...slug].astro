@@ -20,7 +20,12 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 	<a class="back" href={`${import.meta.env.BASE_URL}`} aria-label="Back to main page">&larr;</a>
 
 	<article class="panel">
-		<time datetime={post.data.date.toISOString()}>{date}</time>
+		<dl class="facts">
+			<div>
+				<dt>Date</dt>
+				<dd><time datetime={post.data.date.toISOString()}>{date}</time></dd>
+			</div>
+		</dl>
 		<h1>{post.data.title}</h1>
 		{post.data.summary && <p class="summary">{post.data.summary}</p>}
 		<Content />
@@ -54,8 +59,30 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 		margin: 1rem 0;
 	}
 
-	time {
+	/* same facts row as project pages */
+	.facts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 1.75rem;
+		margin: 0 0 1.5rem;
 		font-size: 0.85rem;
+	}
+
+	.facts div {
+		display: flex;
+		gap: 0.5rem;
+		align-items: baseline;
+	}
+
+	.facts dt {
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.facts dd {
+		margin: 0;
 		color: var(--color-muted);
 	}
 

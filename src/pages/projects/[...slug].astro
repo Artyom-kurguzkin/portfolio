@@ -139,8 +139,9 @@ const facts: [string, string | undefined][] = [
 			border-bottom: none;
 		}
 
+		/* top-aligned: the facts row sits at the top of the card, as on pages without an image */
 		.hero:has(.hero-image) .hero-text {
-			align-self: center;
+			align-self: start;
 			padding: var(--pad) 0 2rem;
 		}
 

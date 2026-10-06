@@ -11,8 +11,7 @@ image: /media/zumo-loop-poster.webp
 video: /media/zumo-loop.mp4
 thumb: /img/zumo-thumb.webp
 context: >-
-  This is a guided uni project that I did a while ago. We built and programmed a control unit
-  for line-following robots capable of traversing predefined terrain.
+  This is a guided uni project that I did a while ago.
 ---
 
 ## Core ideas

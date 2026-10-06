@@ -3,17 +3,13 @@ title: Single Cycle CPU
 summary: A single-cycle CPU in VHDL, compatible with a minimal MIPS instruction set, that runs the Sieve of Eratosthenes.
 category: Electronics
 organisation: Flinders
-date: 2026-01-01
+date: 2026-08-01
 stack: [VHDL, GHDL, Vivado, Make, Python]
 link: https://github.com/Artyom-kurguzkin/singe-cycle-cpu
 image: /img/cpu-hero.webp
 thumb: /img/cpu-thumb.webp
 context: >-
-  A single-cycle CPU implementation in VHDL capable of running the Sieve of Eratosthenes
-  algorithm, compatible with a minimal MIPS instruction set architecture. It has a distinct
-  datapath, ALU, register file, instruction memory, data memory with integrated output
-  registers, control unit and program counter. Beyond the brief, I also wrote an assembler and
-  a program loader, to see the CPU run more than just the one program it was tasked with.
+  This is one of my university projects. A single-cycle CPU implementation in VHDL compatible with a minimal MIPS instruction set architecture.  
 ---
 
 ## Core ideas
