@@ -4,7 +4,7 @@ summary: Automating the 3D modelling of orthotic devices from body scans, and de
 category: Modeling
 organisation: Novita
 date: 2025-03-01
-contributors: [Connor Hldback, Fairuz Labiba]
+contributors: [Connor Holdback, Fairuz Labiba]
 stack: [Blender, Python (Blender API), PrusaSlicer]
 image: /img/orthotics-hero.webp
 thumb: /img/orthotics-thumb.webp
