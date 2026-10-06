@@ -19,7 +19,9 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 <Layout title={post.data.title} description={post.data.summary}>
 	<a class="back" href={`${import.meta.env.BASE_URL}`} aria-label="Back to main page">&larr;</a>
 
-	<article class="panel">
+	<!-- a header card, then one card per "## entry" of the post, all in one grid -->
+	<article class="board">
+		<header class="panel head">
 		<dl class="facts">
 			<div>
 				<dt>Date</dt>
@@ -28,11 +30,28 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 		</dl>
 		<h1>{post.data.title}</h1>
 		{post.data.summary && <p class="summary">{post.data.summary}</p>}
-		<Content />
+		</header>
+		<div class="entries">
+			<Content />
+		</div>
 	</article>
 </Layout>
 
 <script>
+	// each "## entry" (its heading and everything up to the next one) becomes its own card
+	const entries = document.querySelector('.entries')!;
+	for (const h of [...entries.querySelectorAll(':scope > h2')]) {
+		const card = document.createElement('section');
+		card.className = 'panel';
+		h.before(card);
+		let node: ChildNode | null = h;
+		while (node && !(node !== h && node instanceof HTMLHeadingElement && node.tagName === 'H2')) {
+			const next: ChildNode | null = node.nextSibling;
+			card.append(node);
+			node = next;
+		}
+	}
+
 	// a YouTube link alone on its own line becomes an embedded player (commentary stays as written around it)
 	const YT = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/;
 	for (const a of document.querySelectorAll<HTMLAnchorElement>('article p > a:only-child')) {
@@ -49,6 +68,45 @@ const date = post.data.date.toLocaleDateString('en-GB', { day: 'numeric', month:
 </script>
 
 <style>
+	/* same width and gaps as the project pages */
+	/* header and entry cards share one grid, as many across as fit; every entry holds a 16:9
+	   player, so a row comes out even, and the header fills the first cell instead of a whole row */
+	.board {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+		gap: 1.25rem;
+		max-width: 68rem;
+		margin: clamp(1rem, 4vw, 2rem) auto;
+	}
+
+	@media (min-width: 96rem) {
+		.board {
+			max-width: min(120rem, 100% - 8rem); /* gutter clears the back button */
+		}
+	}
+
+	.board :global(.panel) {
+		margin: 0;
+		max-width: none;
+	}
+
+	.entries {
+		display: contents;
+	}
+
+	.entries :global(h2) {
+		margin: 0 0 0.75rem;
+		font-size: 1.1rem;
+	}
+
+	.entries :global(.panel > :last-child) {
+		margin-bottom: 0;
+	}
+
+	.head > :last-child {
+		margin-bottom: 0;
+	}
+
 	article :global(.video) {
 		display: block;
 		width: 100%;

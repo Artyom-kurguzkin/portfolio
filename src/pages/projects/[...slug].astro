@@ -104,8 +104,8 @@ const facts: [string, string | undefined][] = [
 	// - otherwise (short text next to wide pictures can never be that tall) the text runs
 	//   across the top and the pictures form one row below, all the same height, filling the
 	//   card's width
-	// Pictures never grow past MAX_H. Re-run on resize and as pictures load.
-	const MAX_H = 560;
+	// Pictures never grow past MAX_H (see balance). Re-run on resize and as pictures load.
+	const PAGE_MAX_H = 560;
 	const MIN_TEXT = 288; // 18rem
 	const wide = matchMedia('(min-width: 60rem)');
 	const balance = (card: HTMLElement) => {
@@ -127,6 +127,15 @@ const facts: [string, string | undefined][] = [
 		};
 		const ratios = pics.map(ratio);
 		const sumRatio = ratios.reduce((a, b) => a + b, 0);
+		// pictures are exported at ~2x: never shown taller than 60% of their pixels (beyond that a
+		// diagram's lettering just gets huge), and never past MAX_H
+		const MAX_H = Math.min(
+			PAGE_MAX_H,
+			...pics.map((el) => {
+				const m = media(el);
+				return (m.naturalHeight || m.videoHeight || 1e4) * 0.6;
+			})
+		);
 		const caption = Math.max(...pics.map((el) => el.offsetHeight - media(el).offsetHeight));
 		const gap = parseFloat(getComputedStyle(card).columnGap) || 0;
 		const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) * 2;
@@ -136,6 +145,16 @@ const facts: [string, string | undefined][] = [
 				el.style.flex = `0 0 ${h * ratios[i]}px`;
 				el.style.maxWidth = 'none';
 			});
+
+		// text that's only a title: title on top, pictures below
+		if (!text.querySelector('p, ul, ol')) {
+			card.classList.add('stacked');
+			text.style.flex = '0 0 100%';
+			const h = Math.min(MAX_H, (inner - gap * (pics.length - 1)) / sumRatio);
+			setPics(h);
+			if (pics.length === 1 && h < MAX_H - 1) pics[0].style.flex = '0 0 100%';
+			return h < MAX_H - 1;
+		}
 
 		// side by side: pictures get room - w, so their height is (room - w) / sumRatio
 		const room = inner - codeWidth - gap * pics.length;
@@ -160,9 +179,9 @@ const facts: [string, string | undefined][] = [
 
 		// stacked: text (and any code beside it) across the top, then one row of pictures
 		// filling the width
-		const rowHeight = Math.min(MAX_H, (inner - gap * (pics.length - 1)) / sumRatio);
+		const rowHeight = Math.min(MAX_H, (inner - codeWidth - gap * (pics.length - 1)) / sumRatio);
 		const rowWidth = rowHeight * sumRatio + gap * (pics.length - 1);
-		if (rowHeight === MAX_H) {
+		if (rowHeight >= MAX_H - 1) {
 			// the pictures can't fill the width: either way some space stays empty, so compare
 			// the strip beside the stacked pictures with the strip under the text beside them
 			const besideEmpty = (inner - rowWidth) * rowHeight;
@@ -177,11 +196,11 @@ const facts: [string, string | undefined][] = [
 			}
 		}
 		card.classList.add('stacked');
-		text.style.flex = '1 1 0';
+		text.style.flex = '0 0 100%'; // across the top; any code sits in the picture row, beside the pictures
 		setPics(rowHeight);
 		// a single picture under the text simply spans the card (a video needs the width for its controls)
-		if (pics.length === 1 && rowHeight < MAX_H) pics[0].style.flex = '0 0 100%';
-		return rowHeight < MAX_H; // the pictures fill the width
+		if (pics.length === 1 && rowHeight < MAX_H - 1) pics[0].style.flex = '0 0 100%';
+		return rowHeight < MAX_H - 1; // the pictures fill the width
 	};
 
 	// A picture card whose text is too short for its pictures leaves empty space whatever the
@@ -230,56 +249,22 @@ const facts: [string, string | undefined][] = [
 	const heightAt = (card: HTMLElement, w: number) => {
 		card.style.flex = `0 0 ${w}px`;
 		card.style.alignSelf = 'flex-start';
-		layoutInner(card);
+		if (card.classList.contains('pics')) balance(card);
+		else layoutInner(card);
 		const h = card.offsetHeight;
 		card.style.alignSelf = '';
 		return h;
 	};
-	// narrowest width at which the card is no taller than h
-	const widthFor = (card: HTMLElement, h: number, max: number) => {
-		if (heightAt(card, max) > h) return Infinity;
-		let lo = 320;
-		let hi = max;
-		for (let i = 0; i < 10; i++) {
-			const mid = (lo + hi) / 2;
-			if (heightAt(card, mid) > h) lo = mid;
-			else hi = mid;
-		}
-		return hi;
-	};
-	// Lays the row out at one shared height and returns the width it couldn't use: when some
-	// card can't get shorter (its code block holds it up), the others reach that height while
-	// still narrower than the row, and the rest would only be empty space.
-	const layoutRow = (row: HTMLElement[], full: number, gap: number) => {
-		const room = full - gap * (row.length - 1);
-		if (row.length === 1) {
-			row[0].style.flex = '1 1 100%';
-			layoutInner(row[0]);
-			return 0;
-		}
-		const max = room - 320 * (row.length - 1);
-		let lo = Math.max(...row.map((c) => heightAt(c, max)));
-		let hi = Math.max(...row.map((c) => heightAt(c, 320)));
-		for (let i = 0; i < 12; i++) {
-			const mid = (lo + hi) / 2;
-			const total = row.reduce((sum, c) => sum + widthFor(c, mid, max), 0);
-			if (total > room) lo = mid;
-			else hi = mid;
-		}
-		const widths = row.map((c) => widthFor(c, hi, max));
-		const spare = room - widths.reduce((a, b) => a + b, 0);
-		// any small leftover goes to a text-only card, which absorbs it with barely a change
-		const taker = Math.max(0, row.findIndex((c) => c.children.length === 1));
-		widths[taker] += spare;
-		row.forEach((c, i) => {
-			c.style.flex = `0 0 ${widths[i] - 0.5}px`;
-			layoutInner(c);
-		});
-		return spare;
-	};
 	// Cards keep their reading order in data-order, so columns can be taken apart again.
 	document.querySelectorAll('.flow > .card').forEach((c, i) => ((c as HTMLElement).dataset.order = String(i)));
+	// merged cards (see layoutFlows), undone at the start of every layout pass
+	const merges: { card: HTMLElement; text: HTMLElement; title: Element[]; pics: HTMLElement[] }[] = [];
 	const unwrap = (flow: HTMLElement) => {
+		for (const m of merges.splice(0).filter((m) => flow.contains(m.card))) {
+			m.text.append(...m.title);
+			m.card.append(...m.pics);
+			m.card.style.display = '';
+		}
 		flow.querySelectorAll(':scope > .col').forEach((col) => col.replaceWith(...col.children));
 		const cards = ([...flow.children] as HTMLElement[]).sort((a, b) => +a.dataset.order! - +b.dataset.order!);
 		flow.append(...cards);
@@ -346,6 +331,104 @@ const facts: [string, string | undefined][] = [
 		heightAt(text, hi);
 		picsHeightAt(pics, room - hi);
 	};
+	// Cards without pictures go into k columns, in reading order down each column. For each k,
+	// the cards are split (in order) so the columns come out as even as possible, then the column
+	// widths are solved so all columns end at the same height. The k that leaves the least empty
+	// area wins; a column's last card stretches to the shared bottom.
+	const makeCol = (cards: HTMLElement[]) => {
+		const col = document.createElement('div');
+		col.className = 'col';
+		cards[0].before(col);
+		col.append(...cards);
+		cards.forEach((c) => (c.style.flex = '0 0 auto'));
+		return col;
+	};
+	const colHeightAt = (col: HTMLElement, w: number, gap: number) => {
+		col.style.flex = `0 0 ${w}px`;
+		col.style.alignSelf = 'flex-start';
+		const cards = [...col.children] as HTMLElement[];
+		cards.forEach((c) => {
+			c.style.flex = '0 0 auto';
+			layoutInner(c);
+		});
+		const h = cards.reduce((sum, c) => sum + c.offsetHeight, 0) + gap * (cards.length - 1);
+		col.style.alignSelf = '';
+		return h;
+	};
+	// split heights into k contiguous groups, minimising the tallest group
+	const partition = (heights: number[], k: number, gap: number) => {
+		const n = heights.length;
+		const sum = (a: number, b: number) => heights.slice(a, b).reduce((x, y) => x + y, 0) + gap * (b - a - 1);
+		const best: number[][] = Array.from({ length: k + 1 }, () => Array(n + 1).fill(Infinity));
+		const cut: number[][] = Array.from({ length: k + 1 }, () => Array(n + 1).fill(0));
+		best[0][0] = 0;
+		for (let j = 1; j <= k; j++)
+			for (let b = j; b <= n; b++)
+				for (let a = j - 1; a < b; a++) {
+					const v = Math.max(best[j - 1][a], sum(a, b));
+					if (v < best[j][b]) {
+						best[j][b] = v;
+						cut[j][b] = a;
+					}
+				}
+		const groups: number[][] = [];
+		for (let j = k, b = n; j > 0; j--) {
+			const a = cut[j][b];
+			groups.unshift([a, b]);
+			b = a;
+		}
+		return groups;
+	};
+	const packColumns = (run: HTMLElement[], full: number, gap: number, maxCols: number) => {
+		if (!run.length) return;
+		if (run.length === 1) {
+			run[0].style.flex = '1 1 100%';
+			layoutInner(run[0]);
+			return;
+		}
+		const options = [];
+		for (let k = 2; k <= Math.min(run.length, maxCols); k++) {
+			const w = (full - gap * (k - 1)) / k;
+			const heights = run.map((c) => heightAt(c, w));
+			options.push(partition(heights, k, gap));
+		}
+		let best: { groups: number[][]; widths: number[]; empty: number } | undefined;
+		for (const groups of options) {
+			const cols = groups.map(([a, b]) => makeCol(run.slice(a, b)));
+			const room = full - gap * (cols.length - 1);
+			// narrowest width at which the column is no taller than h
+			const widthFor = (col: HTMLElement, h: number, max: number) => {
+				if (colHeightAt(col, max, gap) > h) return max + 1;
+				let lo = 300;
+				let hi = max;
+				for (let i = 0; i < 9; i++) {
+					const mid = (lo + hi) / 2;
+					if (colHeightAt(col, mid, gap) > h) lo = mid;
+					else hi = mid;
+				}
+				return hi;
+			};
+			const max = room - 300 * (cols.length - 1);
+			let lo = Math.max(...cols.map((c) => colHeightAt(c, max, gap)));
+			let hi = Math.max(...cols.map((c) => colHeightAt(c, 300, gap)));
+			for (let i = 0; i < 9; i++) {
+				const mid = (lo + hi) / 2;
+				if (cols.reduce((sum, c) => sum + widthFor(c, mid, max), 0) > room) lo = mid;
+				else hi = mid;
+			}
+			const widths = cols.map((c) => Math.min(widthFor(c, hi, max), max));
+			widths[widths.indexOf(Math.min(...widths))] += room - widths.reduce((a, b) => a + b, 0);
+			const empty = cols.reduce((sum, c, i) => sum + (hi - colHeightAt(c, widths[i], gap)) * widths[i], 0);
+			if (!best || empty < best.empty) best = { groups, widths, empty };
+			cols.forEach((col) => col.replaceWith(...col.children));
+		}
+		const cols = best!.groups.map(([a, b]) => makeCol(run.slice(a, b)));
+		cols.forEach((col, i) => {
+			col.style.flex = `0 0 ${best!.widths[i] - 0.5}px`;
+			[...col.children].forEach((c) => layoutInner(c as HTMLElement));
+			(col.lastElementChild as HTMLElement).style.flex = '1 1 auto';
+		});
+	};
 	const layoutFlows = () => {
 		document.querySelectorAll<HTMLElement>('.flow').forEach((flow) => {
 			const all = unwrap(flow);
@@ -363,7 +446,24 @@ const facts: [string, string | undefined][] = [
 			all.filter((c) => c.classList.contains('pics')).forEach((c) => {
 				if (!c.isConnected) return;
 				c.style.flex = '1 1 100%';
-				if (!fitPictures(c)) unfilled.add(c);
+				if (fitPictures(c)) return;
+				// a section that's only a title and pictures, after a card with pictures: its title
+				// and pictures join that card's picture row, so neither card is left half empty
+				const text = c.querySelector<HTMLElement>(':scope > .item.text');
+				const prev = c.previousElementSibling as HTMLElement | null;
+				if (text && !text.querySelector('p, ul, ol') && prev?.classList.contains('pics')) {
+					const pics = [...c.children].filter((el) => el !== text) as HTMLElement[];
+					const title = [...text.children];
+					pics[0].prepend(...title);
+					prev.append(...pics);
+					c.style.display = 'none';
+					merges.push({ card: c, text, title, pics });
+					if (fitPictures(prev)) {
+						unfilled.delete(prev);
+						return;
+					}
+				}
+				unfilled.add(c);
 			});
 			// rows of cards without pictures: start with two, and keep taking the next card while
 			// the row can't use its full width (and each card still gets at least 320px)
@@ -371,7 +471,35 @@ const facts: [string, string | undefined][] = [
 			const cards = [...flow.children] as HTMLElement[];
 			let i = 0;
 			while (i < cards.length) {
+				if (cards[i].style.display === 'none') {
+					i++; // merged into the card before it
+					continue;
+				}
 				if (cards[i].classList.contains('pics')) {
+					// two picture cards in a row that each can't fill the width (their pictures stop
+					// growing first) share a row, splitting it in proportion to what they hold
+					const pair = cards[i + 1];
+					if (unfilled.has(cards[i]) && pair && unfilled.has(pair) && pair.style.display !== 'none') {
+						const want = (c: HTMLElement) =>
+							[...c.children].reduce((sum, el) => sum + (el as HTMLElement).getBoundingClientRect().width, 0) + 160;
+						const [a, b] = [want(cards[i]), want(pair)];
+						// start from a split in proportion, then move it until both come out equally tall
+						const room = full - gap;
+						let lo = Math.max(320, room * 0.25);
+						let hi = Math.min(room - 320, room * 0.75);
+						let w = (room * a) / (a + b);
+						for (let k = 0; k < 10; k++) {
+							const diff = picsHeightAt(cards[i], w) - picsHeightAt(pair, room - w);
+							if (Math.abs(diff) < 8) break;
+							if (diff > 0) lo = w; // the first is taller: widen it so it gets shorter
+							else hi = w;
+							w = (lo + hi) / 2;
+						}
+						picsHeightAt(cards[i], w);
+						picsHeightAt(pair, room - w);
+						i += 2;
+						continue;
+					}
 					const card = cards[i++];
 					const next = cards[i];
 					// a picture card that can't fill a full row (its text is too short) narrows to its
@@ -393,16 +521,13 @@ const facts: [string, string | undefined][] = [
 					i += stackUnder([card, after], cards.slice(i), gap);
 					continue;
 				}
-				const row = [cards[i++]];
-				let spare = layoutRow(row, full, gap);
-				while (i < cards.length && !cards[i].classList.contains('pics') && row.length < maxPerRow) {
-					if (row.length >= 2 && spare < 40) break;
-					row.push(cards[i++]);
-					spare = layoutRow(row, full, gap);
-				}
-				if (row.length > 1) i += stackUnder(row, cards.slice(i), gap);
+				// a run of cards without pictures: laid out as columns (see packColumns)
+				const run: HTMLElement[] = [];
+				while (i < cards.length && !cards[i].classList.contains('pics') && !(cards[i + 1] && unfilled.has(cards[i + 1]) && run.length)) run.push(cards[i++]);
+				packColumns(run, full, gap, maxPerRow);
 			}
 		});
+		markZoomable(); // laid out after this script has run, so it's defined by then
 	};
 	const balanceAll = layoutFlows;
 
@@ -412,14 +537,16 @@ const facts: [string, string | undefined][] = [
 	zoom.className = 'zoom';
 	zoom.setAttribute('aria-label', 'Enlarged view');
 	document.body.append(zoom);
-	document.querySelectorAll<HTMLElement>('.board .hero-image, .board .card img, .board .card pre').forEach((el) => {
-		el.classList.add('zoomable');
-		el.tabIndex = 0;
-		el.removeAttribute('aria-hidden');
-		el.setAttribute('role', 'button');
-		const what = el.matches('.hero-image') ? 'project picture' : el.getAttribute('alt') || 'code';
-		el.setAttribute('aria-label', `Enlarge ${what}`);
-	});
+	const markZoomable = () =>
+		document.querySelectorAll<HTMLElement>('.board .hero-image, .board .card img, .board .card pre').forEach((el) => {
+			el.classList.add('zoomable');
+			el.tabIndex = 0;
+			el.removeAttribute('aria-hidden');
+			el.setAttribute('role', 'button');
+			const what = el.matches('.hero-image') ? 'project picture' : el.getAttribute('alt') || 'code';
+			el.setAttribute('aria-label', `Enlarge ${what}`);
+		});
+	markZoomable();
 	const open = (el: HTMLElement) => {
 		const copy = el.cloneNode(true) as HTMLElement;
 		// a bare copy: the page's own classes, scoping attributes and sizes stay behind
