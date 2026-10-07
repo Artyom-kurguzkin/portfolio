@@ -36,6 +36,7 @@ const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', yea
 	}
 	<span class="title">{project.data.title}</span>
 	<span class="meta">{project.data.organisation && <span class="org">{project.data.organisation}</span>}{date}</span>
+	{project.data.stack.length > 0 && <span class="tools">{project.data.stack.join(' · ')}</span>}
 </a>
 
 <style>
@@ -73,18 +74,24 @@ const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', yea
 		overflow-wrap: break-word;
 	}
 
-	/* details (organisation · date): always in list view; on cards unless only a category
-	   filter is applied. The organisation is dropped once one is picked (it's the same for all). */
+	/* details (organisation · date) always show; the organisation is dropped once one is picked
+	   (it's the same for all) */
 	.meta {
-		display: none;
 		flex: none;
 		font-size: 0.8rem;
 		color: var(--color-muted);
 	}
 
-	:global(.gallery:not(.cat-filtered)) .meta,
-	:global(.gallery.org-filtered) .meta {
-		display: block;
+	/* tools: card view only (list rows and the narrow mobile rows stay compact) */
+	.tools {
+		margin-top: -0.3rem;
+		font-size: 0.75rem;
+		line-height: 1.4;
+		color: var(--color-muted);
+	}
+
+	:global(.gallery:has(> :nth-child(7 of :not(.is-hidden)))) .tools {
+		display: none;
 	}
 
 	.org::after {
@@ -134,6 +141,10 @@ const date = project.data.date.toLocaleDateString('en-GB', { month: 'short', yea
 
 		.meta {
 			grid-column: 2;
+		}
+
+		.tools {
+			display: none;
 		}
 
 		.avatar {

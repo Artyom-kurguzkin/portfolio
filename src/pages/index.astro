@@ -117,8 +117,7 @@ const writings = (await getCollection('writings')).sort(
 	function applyFilter() {
 		const active = document.querySelector('.chip.active[data-filter]')?.getAttribute('data-filter') ?? 'all';
 		const org = orgSelect.value;
-		// drive which details the tiles show (see .meta in ProjectCard.astro)
-		gallery.classList.toggle('cat-filtered', active !== 'all');
+		// with an organisation picked, tiles drop it from their details (see .org in ProjectCard.astro)
 		gallery.classList.toggle('org-filtered', org !== '');
 		for (const tile of gallery.children) {
 			const el = tile as HTMLElement;
