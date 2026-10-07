@@ -163,8 +163,18 @@ img {
 	--sk-line: #17171c;
 	--sk-w: 1.5px;
 	color: #17171c;
-	font-size: 1.25rem;
 	text-decoration: none;
+}
+
+/* a drawn arrow: a text arrow sits off-centre in the monospace font */
+.back svg {
+	width: 55%;
+	height: 55%;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2.4;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 /* phones: pinned to the bottom right, in thumb reach while scrolling */
@@ -174,8 +184,8 @@ img {
 		z-index: 10;
 		right: 1rem;
 		bottom: calc(1rem + env(safe-area-inset-bottom));
-		width: 3.25rem;
-		height: 3.25rem;
+		width: 4rem;
+		height: 4rem;
 		box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
 	}
 }

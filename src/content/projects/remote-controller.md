@@ -5,6 +5,7 @@ category: Electronics
 organisation: Flinders
 date: 2025-09-19
 stack: [PIC32, C, IR LED, IR receiver, Buzzer, Potentiometer, Push buttons]
+link: https://github.com/Artyom-kurguzkin/remote-controller
 image: /img/remote-hero.webp
 thumb: /img/remote-thumb.webp
 context: >-
