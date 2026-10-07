@@ -8,7 +8,7 @@ interface Props {
 	description?: string;
 }
 
-const { title, description = 'Portfolio site.' } = Astro.props;
+const { title, description = 'I like making nice things that are also useful.' } = Astro.props;
 ---
 
 <!doctype html>
@@ -20,6 +20,17 @@ const { title, description = 'Portfolio site.' } = Astro.props;
 		<link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg?v=2`} type="image/svg+xml" />
 		<meta name="description" content={description} />
 		<title>{title}</title>
+
+		<!-- link previews (LinkedIn, Slack, ...): one site-wide image, a screenshot of the main page -->
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Artyom Kurguzkin" />
+		<meta property="og:title" content={title === 'Home' ? 'Artyom Kurguzkin' : title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
+		<meta property="og:image" content={new URL('og.png', Astro.site)} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="627" />
+		<meta name="twitter:card" content="summary_large_image" />
 
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
