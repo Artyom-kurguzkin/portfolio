@@ -531,8 +531,9 @@ const facts: [string, string | undefined][] = [
 	};
 	const balanceAll = layoutFlows;
 
-	// Zoom: click (or Enter) on a picture or code block opens it full screen. In there, a click on
-	// the picture toggles its actual size; a click anywhere else, or Escape, closes it.
+	// Zoom: click (or Enter) on a picture or code block opens it full screen, pictures at their
+	// full resolution. In there, a click on the picture toggles fit-to-screen; a click anywhere
+	// else, or Escape, closes it.
 	const zoom = document.createElement('dialog');
 	zoom.className = 'zoom';
 	zoom.setAttribute('aria-label', 'Enlarged view');
@@ -553,8 +554,13 @@ const facts: [string, string | undefined][] = [
 		[...copy.attributes]
 			.filter((a) => a.name.startsWith('data-astro') || ['class', 'style', 'tabindex', 'role', 'aria-label', 'loading'].includes(a.name))
 			.forEach((a) => copy.removeAttribute(a.name));
+		// pictures open straight at full resolution, scrolled to their centre
+		if (copy instanceof HTMLImageElement) copy.classList.add('actual');
 		zoom.replaceChildren(copy);
 		zoom.showModal();
+		const centre = () => zoom.scrollTo((zoom.scrollWidth - zoom.clientWidth) / 2, (zoom.scrollHeight - zoom.clientHeight) / 2);
+		if (copy instanceof HTMLImageElement && !copy.complete) copy.addEventListener('load', centre, { once: true });
+		else centre();
 		if (copy instanceof HTMLVideoElement) copy.play().catch(() => {});
 	};
 	document.addEventListener('click', (e) => {
@@ -812,6 +818,14 @@ const facts: [string, string | undefined][] = [
 	.board :global(.item:has(.zoomable:is(:hover, :focus-visible)))::after,
 	.hero:has(.hero-image:is(:hover, :focus-visible)) .zoom-badge {
 		opacity: 1;
+	}
+
+	/* phones and touch screens: no hover to reveal it, so the badge always shows */
+	@media (hover: none), (max-width: 40rem) {
+		.board :global(.item:has(.zoomable))::after,
+		.zoom-badge {
+			opacity: 1;
+		}
 	}
 
 	:global(dialog.zoom) {

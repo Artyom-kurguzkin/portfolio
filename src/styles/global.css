@@ -177,12 +177,12 @@ img {
 	stroke-linejoin: round;
 }
 
-/* phones: pinned to the bottom right, in thumb reach while scrolling */
+/* phones: pinned to the bottom left, in thumb reach while scrolling */
 @media (max-width: 40rem) {
 	.back {
 		position: fixed;
 		z-index: 10;
-		right: 1rem;
+		left: 1rem;
 		bottom: calc(1rem + env(safe-area-inset-bottom));
 		width: 4rem;
 		height: 4rem;
