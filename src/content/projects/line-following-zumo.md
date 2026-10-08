@@ -41,9 +41,3 @@ From this basic line-following state, we built extra behaviours (more states!) f
 ## Debugging and teamwork
 
 Nothing worked on the first try. To help with troubleshooting, we used the Wi-Fi module integrated into the Flinduino board, sending logs over a serial connection that we read in a PuTTY terminal. To collaborate as a team, we kept a shared GitHub repo that every team member could access.
-
-## Outcome
-
-<video src="https://github.com/user-attachments/assets/fbe06639-9d38-4dc6-822f-b6bc1b883644" controls muted playsinline preload="metadata"></video>
-
-*Demo run on the trial course.*

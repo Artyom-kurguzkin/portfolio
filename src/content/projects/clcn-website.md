@@ -1,6 +1,6 @@
 ---
 title: CLCN Website
-summary: Building and running CLCN's website, from a bilingual WordPress site to a React app on Cloud Run.
+summary: Building and running CLCN's website, from WordPress to a React app on Cloud Run.
 category: Web
 organisation: CLCN
 date: 2026-03-01
@@ -10,26 +10,33 @@ stack: [WordPress Gutenberg, React, GCP Cloud Run, GitHub Actions]
 image: /img/clcn-hero.webp
 thumb: /img/clcn-thumb.webp
 context: >-
-  CLCN positions itself as a talent incubator, focused on the employability of international
-  students and skilled migrants in Australia. Its website is how people find its programs and
-  events. Starting in January 2024, our IT team redesigned it, added English/Chinese content,
-  connected it to the tools the organisation runs on, and kept it maintained. In 2026 it was
-  rebuilt as a React app running on Google Cloud Run.
+  This was my first experience running a long-term project; along the way, my responsibilities shifted from core developer to team leader.
 ---
 
 ## Core ideas
 
-- **Block theme over headless** A headless WordPress setup was considered and dropped: the language plugin wasn't compatible with it, and it would be hard to hand over to other developers. We stayed on a block theme and built pages with Kadence.
-- **Templates over one-off pages** Programs, team members and events each got a reusable template, so new content could be added without designing a page from scratch.
-- **Revisions as version control** WordPress page revisions served as our collaborative version control, and we backed the site up before rolling out design changes.
+- **Utility** is the thing we are making actually useful to end users?
+- **Capabilities** what the team can realistically build and maintain with the skills and time it has. How can we manage team's long term as our skills improve?
+- **Content management system** software with a separate management layer that doesnt require its re-deployment or significant effort to change user experience or serve additional information.
+- **Change management** making changes without breaking things; making changes that are useful.
+- **Management levels** Strategic: does the product allign with company's long term goals? Tactical: do capabilities and resources allign with requirements? Operational: does everyone knows what to do next and how?
+- **Compromises**  adding more features serve the long-term goals but stretch resources and make goals uncertain; a better tool helps today's team but may be one the next team can't pick up.
 
 ## Challenge
 
-The site had to be redesigned and kept running at the same time, by a team that met weekly and whose members changed over time. Content came from other teams in English and Chinese, events were ticketed on Humanitix, and parts of the site, such as the media kit and internal tools, needed to be visible to members only.
+In January 2024 the IT team was four volunteers meeting once a week, and the wishlist was ever-growing: a redesign that worked on mobile, English and Chinese versions, Humanitix ticketing, Salesforce data collection, analytics, a photo gallery that sorted photos by person, and an AI chatbot. The site had to stay live while we rebuilt it, and people joined and left the team every few months, so anything we built had to survive being handed over. Lastly the very same team was in charge of technical support and service delivery, so resources had to be managed cautiously. 
 
 ## Approach
 
-The team worked from Figma mockups of each page, desktop and mobile. I ran the weekly IT meetings and kept the minutes: each meeting reviewed what was done, then assigned the next tasks to a named person, usually with a one-week deadline. Once all the initial content was in, we split the work into two streams: maintenance and improvements of the website, and new features, each run as a separate project.
+**Start with no-code.** Leadership wasn't sure yet what a volunteer team could build and maintain, and no-code tools were the safe way to approach a new system. We considered moving to headless WordPress, but agreed to first try restyling the existing theme with custom CSS. Headless was then dropped altogether: the language plugin didn't work with it, and it would have been hard to hand over to the next developers. We stayed on a block theme with Kadence, and when a Figma design couldn't be built in Kadence, we simplified the design instead of fighting the tool.
+
+**Make changes safely.** I ran the weekly meetings and kept the minutes: every task left the meeting with a name and, usually, a one-week deadline. Page revisions served as our version control, and I backed the site up before every design rollout. Once the initial content was in, we split the work into maintenance of the site and separate feature projects, so the site no longer needed the whole team.
+
+**Cut what doesn't help visitors.** Not everything on the wishlist was worth keeping. The photo gallery plugin pulling photos directly from google drive slowed the site down and clashed with the event automation, so I disabled it. Full-page snap scrolling broke the header and footer - also removed.
+
+**Service delivery** In mid-2025 we let branding team to manage posts themsleves. From then on, changes came in as change requests handled by small task groups formed as needed. 
+
+**The cost of no-code.** It kept the site running, but it also set its limits. Every design was cut down to what the page builder and plugins could do, and the work developers did was mostly configuring them. That limit on  growth and creativity over time disincentivised them from active participation.
 
 ![About Us page design mockup, desktop and mobile](../../assets/clcn/about-us-mockup.png)
 
@@ -37,36 +44,37 @@ The team worked from Figma mockups of each page, desktop and mobile. I ran the w
 
 ## How it works
 
-### Pages and templates
+### The WordPress site (2024–2025)
 
-Over the first months of 2024 the team rebuilt the header, footer and mobile menu, and the Home, About Us, Testimonials, Sponsors, Collaborators, Talent Incubation Program and Opportunities pages. I built the page frameworks for the new content, the Events screen, and a template for team member posts that the About Us page queries.
+The first site ran on WordPress with a block theme, pages built in Kadence. Content lived in the CMS, with each reusable content type (page, post) having associated template that we prepared, so branding team could add pages and posts without designing them. 
 
-### Bilingual content
+TranslatePress switched the site between English and Chinese. Later we created automation to post event once they are published in Humanitix: a script run by GitHub Actions assembled the event data from Humanitix and posted it through the WordPress API. 
 
-Switching between English and Chinese is handled by the TranslatePress plugin; the Chinese version of the content was translated in-house.
-
-### Events and Humanitix
-
-Events are ticketed on Humanitix. I integrated it with the site's event templates, and later the team built an automation that assembles event data and creates event posts in WordPress through its API, run with GitHub Actions. In 2025 the Events page was redesigned with filtering.
-
-### Members-only access
-
-I configured single sign-on with CLCN's Google Workspace, so members log in with their CLCN accounts through a "Login with CLCN" button. Pages like the media kit and the email signature generator are restricted to logged-in users.
+CLCN volunteers could log in with their CLCN Google Workspace accounts through a "Login with CLCN" button, which  content like signature generator and Learnin Management System running on LearnPress.
 
 ![The WordPress login screen with the Login with CLCN button](../../assets/clcn/login-with-clcn.png)
 
-*Single sign-on: members log in with their CLCN Google Workspace account.*
+*The WordPress site: members log in with their CLCN Google Workspace account.*
 
-### The 2026 rebuild
+### The transition
 
-The final iteration replaced WordPress with a [React app](https://github.com/COMMUNICATION-LANGUAGE-CULTURE-NETWORK/023d-wbfz-21fd-clcn-website) written in TypeScript and served by a small Express server, covering the About Us, Programs, Global Talent Incubator, CLP, Events, Opportunities and Impact pages. It's packaged with Docker and deployed to Google Cloud Run. I set up the deployment: on every push to `main`, GitHub Actions builds the image and deploys it, authenticating to Google Cloud through Workload Identity Federation, reusing the setup from our ERP project. I also added a route that redirects to the email signature generator.
+Eventually, the team had proved its technical capabilities and built alternative infrastrucure while working on the ERP porject in parallel. So we rebuilt the site from scratch: what we had spent two years on in WordPress took us less than a month in code. 
 
-## Setbacks
+Surprisignly, our decision to ditch out sql database turned out well - we will likely never have enough stuff to store to make use of mysql. Instead we took static CMS approach where changes do require redeployment - this became much simpler as we learnt how to laverage build pipelines. With LLM tools, we also could shift perspective on who and how can contribute - bacause for website's puperoses mostly looks matter, the desired changes can be described by branding team straight to the agent. For more complex scenarios one of our IT members works in pair with them for more coplex bits that need integration like the calendar. 
 
-- **Snap scrolling** Full-page snap scrolling removed the page header and footer. After several weeks of troubleshooting, it was put on hold.
-- **Photo gallery** A plugin that pulled photos into a WordPress gallery slowed the site down and wouldn't work with the event posting automation, so I disabled it.
-- **Security** After the site was attacked, the login page was changed and unused accounts were removed. In 2025 we also enforced two-factor authentication.
+
+### The React site (2026)
+
+The [new site](https://github.com/COMMUNICATION-LANGUAGE-CULTURE-NETWORK/023d-wbfz-21fd-clcn-website) is a React app written in TypeScript and built with Vite and Tailwind, covering the Home, About Us, Programs, Global Talent Incubator, Events, Opportunities, Impact and Resources pages. A small Express server serves the built pages and handles one API route: contact forms, job applications and resource downloads all post to it, and it emails the details to CLCN. Events are kept as a list in the code and shown as a filterable calendar, each linking to its Humanitix registration page.
+
+The deployment: on every push to `main`, GitHub Actions builds a Docker image tagged with the commit, pushes it to Google's registry and deploys it to Cloud Run, authenticating through Workload Identity Federation, so no keys are stored in GitHub. Cloud Run scales the site down to zero when nobody is visiting.
+
+Last but not least, our initial Wordpress hosting costed us around $250 per year; the new setup without database costs us less than $2 per month. 
+
+![The React site's Events calendar, with category filters and upcoming events](../../assets/clcn/react-events.png)
+
+*The React site: the 2026 Events calendar, filtered by program and linked to Humanitix.*
 
 ## Outcome
 
-The React version is live at [clcn.com.au](https://www.clcn.com.au).
+The site is live at [clcn.com.au](https://www.clcn.com.au). 

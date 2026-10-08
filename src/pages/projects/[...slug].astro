@@ -131,6 +131,7 @@ const facts: [string, string | undefined][] = [
 		// diagram's lettering just gets huge), and never past MAX_H
 		const MAX_H = Math.min(
 			PAGE_MAX_H,
+			+(card.dataset.maxH ?? Infinity), // set by fitPictures when the text is too short for the pictures
 			...pics.map((el) => {
 				const m = media(el);
 				return (m.naturalHeight || m.videoHeight || 1e4) * 0.6;
@@ -203,24 +204,14 @@ const facts: [string, string | undefined][] = [
 		return rowHeight < MAX_H - 1; // the pictures fill the width
 	};
 
-	// A picture card whose text is too short for its pictures leaves empty space whatever the
-	// layout, so it takes in a neighbouring card without pictures from the same section (its
-	// text and any code join the text column) and tries again.
-	const donorFor = (card: HTMLElement, el: Element | null) =>
-		el instanceof HTMLElement && !el.classList.contains('pics') && el.dataset.section === card.dataset.section ? el : null;
+	// A picture card whose text is too short for its pictures: the pictures shrink to the text's
+	// height (they can still be zoomed), so every section keeps its own card.
 	const fitPictures = (card: HTMLElement) => {
 		const text = card.querySelector<HTMLElement>(':scope > .item.text');
 		if (!text || card.children.length < 2) return true;
-		while (!balance(card)) {
-			const prev = donorFor(card, card.previousElementSibling);
-			const next = donorFor(card, card.nextElementSibling);
-			const donor = prev ?? next;
-			if (!donor) return false;
-			const html = [...donor.children].map((el) => el.innerHTML).join('');
-			text.innerHTML = donor === prev ? html + text.innerHTML : text.innerHTML + html;
-			donor.remove();
-		}
-		return true;
+		if (balance(card)) return true;
+		card.dataset.maxH = String(Math.max(280, text.offsetHeight - 40));
+		return balance(card);
 	};
 	// Rows: a card with pictures takes a row of its own (fitted above); other cards go two to a
 	// row, and the two widths are chosen so both cards come out the same height: find the
@@ -328,8 +319,13 @@ const facts: [string, string | undefined][] = [
 			if (heightAt(text, mid) > picsHeightAt(pics, room - mid)) lo = mid;
 			else hi = mid;
 		}
-		heightAt(text, hi);
-		picsHeightAt(pics, room - hi);
+		const diff = heightAt(text, hi) - picsHeightAt(pics, room - hi);
+		// only a real pair: about equally tall. Otherwise both take the full width, one under the other.
+		if (Math.abs(diff) < 60) return true;
+		text.style.flex = pics.style.flex = '1 1 100%';
+		layoutInner(text);
+		balance(pics);
+		return false;
 	};
 	// Cards without pictures go into k columns, in reading order down each column. For each k,
 	// the cards are split (in order) so the columns come out as even as possible, then the column
@@ -386,14 +382,28 @@ const facts: [string, string | undefined][] = [
 			layoutInner(run[0]);
 			return;
 		}
-		const options = [];
-		for (let k = 2; k <= Math.min(run.length, maxCols); k++) {
-			const w = (full - gap * (k - 1)) / k;
-			const heights = run.map((c) => heightAt(c, w));
-			options.push(partition(heights, k, gap));
-		}
+		// candidate splits: every way to cut a short run into columns (the most even split isn't
+		// always the least empty one); a long run falls back to the most even split per k
+		const options: number[][][] = [];
+		const n = run.length;
+		if (n <= 7) {
+			for (let mask = 0; mask < 1 << (n - 1); mask++) { // mask 0: one full-width column (last resort)
+				const cuts = [0];
+				for (let i = 1; i < n; i++) if (mask & (1 << (i - 1))) cuts.push(i);
+				cuts.push(n);
+				if (cuts.length - 1 > maxCols) continue;
+				options.push(cuts.slice(0, -1).map((a, i) => [a, cuts[i + 1]]));
+			}
+		} else
+			for (let k = 2; k <= Math.min(n, maxCols); k++) {
+				const w = (full - gap * (k - 1)) / k;
+				options.push(partition(run.map((c) => heightAt(c, w)), k, gap));
+			}
+		// a card with only a line or two never takes a column of its own: it stacks with a neighbour
+		const tiny = run.map((c) => heightAt(c, 300) < 220);
+		const usable = options.filter((g) => g.every(([a, b]) => b - a > 1 || !tiny[a]));
 		let best: { groups: number[][]; widths: number[]; empty: number } | undefined;
-		for (const groups of options) {
+		for (const groups of usable.length ? usable : options) {
 			const cols = groups.map(([a, b]) => makeCol(run.slice(a, b)));
 			const room = full - gap * (cols.length - 1);
 			// narrowest width at which the column is no taller than h
@@ -417,9 +427,18 @@ const facts: [string, string | undefined][] = [
 				else hi = mid;
 			}
 			const widths = cols.map((c) => Math.min(widthFor(c, hi, max), max));
-			widths[widths.indexOf(Math.min(...widths))] += room - widths.reduce((a, b) => a + b, 0);
-			const empty = cols.reduce((sum, c, i) => sum + (hi - colHeightAt(c, widths[i], gap)) * widths[i], 0);
-			if (!best || empty < best.empty) best = { groups, widths, empty };
+			// leftover width goes to the column that sets the row's height (it can't get shorter
+			// anyway); giving it to another would only shorten that one and leave a gap under it
+			const atWidth = cols.map((c, i) => colHeightAt(c, widths[i], gap));
+			widths[atWidth.indexOf(Math.max(...atWidth))] += room - widths.reduce((a, b) => a + b, 0);
+			const heights = cols.map((c, i) => colHeightAt(c, widths[i], gap));
+			const rowH = Math.max(...heights);
+			const empty = heights.reduce((sum, h, i) => sum + (rowH - h) * widths[i], 0);
+			// one full-width column only wins when every side-by-side split leaves a real gap
+			// (over 120px under some column); otherwise the side-by-side split with least empty area
+			const gapPx = rowH - Math.min(...heights);
+			const score = groups.length === 1 ? 1e9 : gapPx > 120 ? 1e9 + empty : empty;
+			if (!best || score < best.empty) best = { groups, widths, empty: score };
 			cols.forEach((col) => col.replaceWith(...col.children));
 		}
 		const cols = best!.groups.map(([a, b]) => makeCol(run.slice(a, b)));
@@ -428,6 +447,17 @@ const facts: [string, string | undefined][] = [
 			[...col.children].forEach((c) => layoutInner(c as HTMLElement));
 			(col.lastElementChild as HTMLElement).style.flex = '1 1 auto';
 		});
+	};
+	// biggest empty strip inside a card: under each item, down to the card's content bottom, past
+	// whatever else sits in the same horizontal band
+	const innerGap = (card: HTMLElement) => {
+		const pad = parseFloat(getComputedStyle(card).paddingBottom);
+		const bottom = card.getBoundingClientRect().bottom - pad;
+		const items = [...card.children].map((el) => el.getBoundingClientRect());
+		return Math.max(
+			0,
+			...items.map((r) => bottom - Math.max(...items.filter((o) => o.left < r.right && o.right > r.left).map((o) => o.bottom)))
+		);
 	};
 	const layoutFlows = () => {
 		document.querySelectorAll<HTMLElement>('.flow').forEach((flow) => {
@@ -444,7 +474,7 @@ const facts: [string, string | undefined][] = [
 			const gap = parseFloat(getComputedStyle(flow).columnGap) || 0;
 			const unfilled = new Set<HTMLElement>();
 			all.filter((c) => c.classList.contains('pics')).forEach((c) => {
-				if (!c.isConnected) return;
+				if (!c.isConnected || c.style.display === 'none') return; // hidden: merged or gap-filled
 				c.style.flex = '1 1 100%';
 				if (fitPictures(c)) return;
 				// a section that's only a title and pictures, after a card with pictures: its title
@@ -479,7 +509,13 @@ const facts: [string, string | undefined][] = [
 					// two picture cards in a row that each can't fill the width (their pictures stop
 					// growing first) share a row, splitting it in proportion to what they hold
 					const pair = cards[i + 1];
-					if (unfilled.has(cards[i]) && pair && unfilled.has(pair) && pair.style.display !== 'none') {
+					// two picture cards where either can't fill a row on its own: try sharing one
+					if (
+						pair &&
+						pair.classList.contains('pics') &&
+						(unfilled.has(cards[i]) || unfilled.has(pair)) &&
+						pair.style.display !== 'none'
+					) {
 						const want = (c: HTMLElement) =>
 							[...c.children].reduce((sum, el) => sum + (el as HTMLElement).getBoundingClientRect().width, 0) + 160;
 						const [a, b] = [want(cards[i]), want(pair)];
@@ -497,7 +533,16 @@ const facts: [string, string | undefined][] = [
 						}
 						picsHeightAt(cards[i], w);
 						picsHeightAt(pair, room - w);
-						i += 2;
+						if (Math.max(innerGap(cards[i]), innerGap(pair)) < 120) {
+							i += 2;
+							continue;
+						}
+						// pairing leaves empty space inside a card: the first takes a full row, and the
+						// second gets its own chance with the card after it
+						cards[i].style.flex = pair.style.flex = '1 1 100%';
+						balance(cards[i]);
+						balance(pair);
+						i += 1;
 						continue;
 					}
 					const card = cards[i++];
@@ -505,9 +550,10 @@ const facts: [string, string | undefined][] = [
 					// a picture card that can't fill a full row (its text is too short) narrows to its
 					// pictures plus a text column, and the following cards stack in the space beside it
 					if (unfilled.has(card) && next && !next.classList.contains('pics')) {
-						pairWithPics(next, card, full, gap);
-						i++;
-						i += stackUnder([card, next], cards.slice(i), gap);
+						if (pairWithPics(next, card, full, gap)) {
+							i++;
+							i += stackUnder([card, next], cards.slice(i), gap);
+						}
 					}
 					continue;
 				}
@@ -516,9 +562,10 @@ const facts: [string, string | undefined][] = [
 				const after = cards[i + 1];
 				if (after && unfilled.has(after)) {
 					const card = cards[i];
-					pairWithPics(card, after, full, gap);
-					i += 2;
-					i += stackUnder([card, after], cards.slice(i), gap);
+					if (pairWithPics(card, after, full, gap)) {
+						i += 2;
+						i += stackUnder([card, after], cards.slice(i), gap);
+					} else i++; // card laid full width; the picture card is handled next
 					continue;
 				}
 				// a run of cards without pictures: laid out as columns (see packColumns)
@@ -529,7 +576,31 @@ const facts: [string, string | undefined][] = [
 		});
 		markZoomable(); // laid out after this script has run, so it's defined by then
 	};
-	const balanceAll = layoutFlows;
+	// Top row on big monitors: hero and Core ideas side by side. The hero's height comes from its
+	// text (its image is size-contained), so the split is searched until both are equally tall.
+	const overview = document.querySelector<HTMLElement>('.overview');
+	const balanceOverview = () => {
+		if (!overview || overview.children.length < 2) return;
+		overview.style.gridTemplateColumns = '';
+		if (!matchMedia('(min-width: 96rem)').matches) return;
+		const [hero, ideas] = [...overview.children] as HTMLElement[];
+		overview.style.alignItems = 'start';
+		let lo = 0.3; // hero share of the width
+		let hi = 0.7;
+		for (let i = 0; i < 12; i++) {
+			const f = (lo + hi) / 2;
+			overview.style.gridTemplateColumns = `${f}fr ${1 - f}fr`;
+			if (hero.offsetHeight > ideas.offsetHeight) lo = f; // hero taller: give it more width
+			else hi = f;
+		}
+		overview.style.gridTemplateColumns = `${hi}fr ${1 - hi}fr`;
+		overview.style.alignItems = '';
+	};
+	const balanceAll = () => {
+		balanceOverview();
+		document.querySelectorAll<HTMLElement>('.flow .card[data-max-h]').forEach((c) => delete c.dataset.maxH);
+		layoutFlows();
+	};
 
 	// Zoom: click (or Enter) on a picture or code block opens it full screen, pictures at their
 	// full resolution. In there, a click on the picture toggles fit-to-screen; a click anywhere
@@ -546,6 +617,19 @@ const facts: [string, string | undefined][] = [
 			el.setAttribute('role', 'button');
 			const what = el.matches('.hero-image') ? 'project picture' : el.getAttribute('alt') || 'code';
 			el.setAttribute('aria-label', `Enlarge ${what}`);
+			// cards: each picture / code block gets a wrapper holding its own badge, so the badge
+			// stays on it wherever layout moves it (the hero has its badge in the markup)
+			if (el.matches('.hero-image') || el.parentElement!.classList.contains('zoom-wrap')) return;
+			const wrap = document.createElement('span');
+			wrap.className = 'zoom-wrap';
+			// the picture's size cap (set by SectionCards) moves to the wrapper, so the badge sits on its corner
+			wrap.style.maxWidth = el.style.maxWidth;
+			el.style.maxWidth = '';
+			const badge = document.createElement('span');
+			badge.className = 'zoom-badge';
+			badge.setAttribute('aria-hidden', 'true');
+			el.before(wrap);
+			wrap.append(el, badge);
 		});
 	markZoomable();
 	const open = (el: HTMLElement) => {
@@ -786,15 +870,23 @@ const facts: [string, string | undefined][] = [
 		outline-offset: 2px;
 	}
 
-	/* a small magnifier badge shows on the item's corner (the hero gets a real element, since a
-	   .panel's ::before/::after already draw its border and grain) */
-	.board :global(.item:has(.zoomable)) {
+	/* a small magnifier badge always shows on each zoomable's top-right corner */
+	.board :global(.zoom-wrap) {
 		position: relative;
+		display: block;
+		width: 100%;
+		margin: 0 auto 0.5rem;
 	}
 
-	.board :global(.item:has(.zoomable))::after,
-	.zoom-badge {
-		content: '';
+	.board :global(.zoom-wrap:has(> pre)) {
+		margin-block: 1rem;
+	}
+
+	.board :global(.zoom-wrap > :is(img, pre)) {
+		margin: 0;
+	}
+
+	.board :global(.zoom-badge) {
 		position: absolute;
 		z-index: 1;
 		top: 0.6rem;
@@ -806,25 +898,29 @@ const facts: [string, string | undefined][] = [
 		background: var(--color-yellow)
 			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317171c' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6'/%3E%3Cpath d='M15 15l5 5M10.5 8v5M8 10.5h5'/%3E%3C/svg%3E")
 			center / 60% no-repeat;
-		opacity: 0;
 		pointer-events: none;
 	}
 
-	.zoom-badge {
+	.hero > .zoom-badge {
 		top: 1.25rem;
 		right: 1.25rem;
 	}
 
-	.board :global(.item:has(.zoomable:is(:hover, :focus-visible)))::after,
-	.hero:has(.hero-image:is(:hover, :focus-visible)) .zoom-badge {
-		opacity: 1;
+	/* hovering a picture or code block: the badge wiggles (runs even with OS animations off) */
+	.board :global(.zoom-wrap:is(:hover, :focus-within) > .zoom-badge),
+	.hero:has(.hero-image:is(:hover, :focus-visible)) > .zoom-badge {
+		animation: zoom-wiggle 0.5s ease;
 	}
 
-	/* phones and touch screens: no hover to reveal it, so the badge always shows */
-	@media (hover: none), (max-width: 40rem) {
-		.board :global(.item:has(.zoomable))::after,
-		.zoom-badge {
-			opacity: 1;
+	@keyframes zoom-wiggle {
+		25% {
+			transform: rotate(-18deg) scale(1.15);
+		}
+		50% {
+			transform: rotate(14deg) scale(1.15);
+		}
+		75% {
+			transform: rotate(-8deg);
 		}
 	}
 
@@ -925,9 +1021,9 @@ const facts: [string, string | undefined][] = [
 		}
 	}
 
-	/* beside Core ideas: the image no longer sets the height, so the hero and the ideas card
-	   come out as tall as the taller of their texts, and neither has an empty strip */
-	@media (min-width: 96rem) {
+	/* the image never sets the hero's height: the text does, so there's no empty strip under it
+	   (and beside Core ideas, both cards come out as tall as the taller text) */
+	@media (min-width: 60rem) {
 		.hero-image {
 			contain: size;
 			min-height: 22rem;
