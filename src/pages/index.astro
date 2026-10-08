@@ -6,7 +6,7 @@ import ProjectCard from '../components/ProjectCard.astro';
 import { Content as AboutContent } from '../data/about.md';
 import { Content as ContactContent } from '../data/contact.md';
 
-const projects = (await getCollection('projects')).sort(
+const projects = (await getCollection('projects', (p) => !p.data.draft)).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 );
 const writings = (await getCollection('writings')).sort(

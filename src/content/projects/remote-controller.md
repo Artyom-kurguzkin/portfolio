@@ -9,16 +9,16 @@ link: https://github.com/Artyom-kurguzkin/remote-controller
 image: /img/remote-hero.webp
 thumb: /img/remote-thumb.webp
 context: >-
-  This is one of my university projects. Software that remotely controls the channel and sound
-  counters on a second Flinduino, communicating over modulated infrared.
+  This is one of my university projects. Software that remotely controls channel and sound
+  on a second Flinduino, communicating over modulated infrared signal.
 ---
 
 ## Core ideas
 
-- **Asynchronous communication** The two boards share no clock. The receiver has to pick out a message from the infrared signal on its own, using timing that both ends agree on in advance.
+- **Asynchronous communication** The two boards share no clock. The receiver has to pick out a message from the infrared signal on its own by recognising frame header.
 - **Framing** Each message is a frame: a header that announces it, the data, and a trailer. Anything that doesn't fit the frame is ignored.
 - **Predefined codes** Every command is an 8-bit code known to both ends: one for each of volume down, volume up, channel down and channel up.
-- **Debouncing** A mechanical button bounces between on and off for a few milliseconds when pressed, so a single read can be wrong. Instead, each loop shifts the button's state into a history byte, and the button only counts as held once the whole byte is ones.
+- **Debouncing** A mechanical button bounces between on and off for a few milliseconds when pressed, so a single read can be wrong. Instead, each loop shifts the button's state into a history byte, and the button only counts as held once the whole byte is filled.
 - **State machine** The system is a loop of states with a critical path that always runs, and branches taken only when there's a message to send or receive.
 
 ## Approach
@@ -113,4 +113,4 @@ The pulse width, bit duration and timeouts are global configuration constants sh
 
 ## Outcome
 
-The system passed the minimum requirements and was marked satisfactory and operational on 19 September 2025. Code quality and robustness could be improved significantly, and a production system would need more testing of less common scenarios. I enjoyed the project and hope to come back to wireless controls sometime.
+The system works! Still, code quality and robustness could be improved significantly, and a production system would need more testing of less common scenarios.

@@ -27,6 +27,8 @@ const projects = defineCollection({
 		contributors: z.array(z.string()).default([]),
 		context: z.string().optional(),
 		date: z.coerce.date(),
+		// work in progress: left out of the gallery and gets no page until set to false
+		draft: z.boolean().default(false),
 	}),
 });
 

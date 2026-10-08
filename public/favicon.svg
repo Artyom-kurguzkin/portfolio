@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-	<!-- "=)" smiley: site palette on the page's dark background -->
+	<!-- "=)" smiley rotated upright: site palette on the page's dark background -->
 	<rect width="32" height="32" rx="8" fill="#1e1e24"/>
-	<g fill="none" stroke-width="3.2" stroke-linecap="round">
+	<g fill="none" stroke-width="3.2" stroke-linecap="round" transform="rotate(90 16 16)">
 		<path d="M7 12.5h8" stroke="#4c72f0"/>
 		<path d="M7 19.5h8" stroke="#22a06b"/>
 		<path d="M20 7.5q6 8.5 0 17" stroke="#ffc94d"/>
