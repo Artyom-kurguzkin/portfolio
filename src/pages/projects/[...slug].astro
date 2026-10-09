@@ -237,6 +237,7 @@ const facts: [string, string | undefined][] = [
 		const text = card.querySelector<HTMLElement>(':scope > .item.text');
 		if (!text || card.children.length < 2) return true;
 		if (balance(card)) return true;
+<<<<<<< HEAD
 		// a single picture's caption moves under the short text, so the text column and the
 		// picture come out closer in height
 		const pics = [...card.children].filter((el) => el !== text) as HTMLElement[];
@@ -250,6 +251,10 @@ const facts: [string, string | undefined][] = [
 		// still a strip under the text: report it, so the card shares a row with a neighbour
 		const tallest = Math.max(...pics.map((el) => el.offsetHeight));
 		return card.classList.contains('stacked') || tallest - text.offsetHeight < 80;
+=======
+		card.dataset.maxH = String(Math.max(280, text.offsetHeight - 40));
+		return balance(card);
+>>>>>>> 3742b11a04675a34d7cbdb4d395bf9d281c105de
 	};
 	const movedCaptions: [HTMLElement, HTMLElement][] = []; // put back before every layout pass
 	// Rows: a card with pictures takes a row of its own (fitted above); other cards go two to a
@@ -555,7 +560,10 @@ const facts: [string, string | undefined][] = [
 						(unfilled.has(cards[i]) || unfilled.has(pair)) &&
 						pair.style.display !== 'none'
 					) {
+<<<<<<< HEAD
 						const gapBefore = Math.max(innerGap(cards[i]), innerGap(pair));
+=======
+>>>>>>> 3742b11a04675a34d7cbdb4d395bf9d281c105de
 						const want = (c: HTMLElement) =>
 							[...c.children].reduce((sum, el) => sum + (el as HTMLElement).getBoundingClientRect().width, 0) + 160;
 						const [a, b] = [want(cards[i]), want(pair)];
@@ -573,6 +581,7 @@ const facts: [string, string | undefined][] = [
 						}
 						picsHeightAt(cards[i], w);
 						picsHeightAt(pair, room - w);
+<<<<<<< HEAD
 						// at the final widths, pictures that outgrow their text shrink to it again
 						for (const c of [cards[i], pair]) {
 							const t = c.querySelector<HTMLElement>(':scope > .item.text');
@@ -584,6 +593,9 @@ const facts: [string, string | undefined][] = [
 						// keep the pair when it leaves no real strip, or at least less than apart
 						const gapAfter = Math.max(innerGap(cards[i]), innerGap(pair));
 						if (gapAfter < 120 || gapAfter < gapBefore - 40) {
+=======
+						if (Math.max(innerGap(cards[i]), innerGap(pair)) < 120) {
+>>>>>>> 3742b11a04675a34d7cbdb4d395bf9d281c105de
 							i += 2;
 							continue;
 						}
@@ -649,7 +661,10 @@ const facts: [string, string | undefined][] = [
 	const balanceAll = () => {
 		balanceOverview();
 		document.querySelectorAll<HTMLElement>('.flow .card[data-max-h]').forEach((c) => delete c.dataset.maxH);
+<<<<<<< HEAD
 		movedCaptions.splice(0).forEach(([caption, item]) => item.append(caption));
+=======
+>>>>>>> 3742b11a04675a34d7cbdb4d395bf9d281c105de
 		layoutFlows();
 	};
 
