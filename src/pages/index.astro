@@ -36,6 +36,10 @@ const writings = (await getCollection('writings')).sort(
 			<AboutContent />
 			<div class="contact">
 				<ContactContent />
+				<!-- Stripe Payment Link: Stripe hosts the checkout, the site holds no keys -->
+				<a class="back coffee" href="https://donate.stripe.com/7sY6oAe9d6fD9BiccZes000" target="_blank" rel="noopener noreferrer">
+					Buy me a coffee ☕
+				</a>
 			</div>
 		</div>
 
@@ -360,6 +364,27 @@ const writings = (await getCollection('writings')).sort(
 	.contact :global(p) {
 		margin: 0;
 		overflow-wrap: anywhere;
+	}
+
+	/* contact line on the left, the coffee button on the right (wraps under it on phones) */
+	.contact {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1.5rem;
+	}
+
+	/* the shared yellow .back pill, minus its phone pinning */
+	.coffee {
+		position: relative;
+		inset: auto;
+		width: auto;
+		height: 2.75rem;
+		padding: 0 1.25rem;
+		font-weight: 700;
+		white-space: nowrap;
+		box-shadow: none;
 	}
 
 	.projects {
