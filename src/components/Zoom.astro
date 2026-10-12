@@ -1,0 +1,192 @@
+---
+// Full-screen zoom for any element with class="zoomable" (pictures, videos, code blocks).
+// Click or Enter opens it, pictures at full resolution (data-zoom="fit": fitted to the screen); in there, a click on the picture toggles
+// fit-to-screen, a click anywhere else or Escape closes it. A .zoom-badge inside a positioned
+// wrapper (.zoom-wrap) shows the yellow magnifier, which wiggles while its item is hovered.
+---
+
+<script>
+	const zoom = document.createElement('dialog');
+	zoom.className = 'zoom';
+	zoom.setAttribute('aria-label', 'Enlarged view');
+	document.body.append(zoom);
+	// the round yellow back button from the page (global .back), pinned bottom left like on phones
+	const close = document.createElement('button');
+	close.className = 'back zoom-close';
+	close.setAttribute('aria-label', 'Close enlarged view');
+	close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>';
+	const projectLink = document.createElement('a');
+	projectLink.className = 'back zoom-project';
+	projectLink.textContent = 'Go to project →';
+
+	const open = (el: HTMLElement) => {
+		const copy = el.cloneNode(true) as HTMLElement;
+		// a bare copy: the page's own classes, scoping attributes and sizes stay behind
+		[...copy.attributes]
+			.filter((a) => a.name.startsWith('data-astro') || ['class', 'style', 'tabindex', 'role', 'aria-label', 'loading'].includes(a.name))
+			.forEach((a) => copy.removeAttribute(a.name));
+		// pictures open straight at full resolution, scrolled to their centre; data-zoom="fit"
+		// (the photo gallery) opens fitted to the screen instead
+		if (copy instanceof HTMLImageElement && el.dataset.zoom !== 'fit') copy.classList.add('actual');
+		// a picture from a project (data-project="url") also gets a button to that project
+		const project = el.dataset.project;
+		if (project) projectLink.href = project;
+		zoom.replaceChildren(copy, close, ...(project ? [projectLink] : []));
+		zoom.showModal();
+		const centre = () => zoom.scrollTo((zoom.scrollWidth - zoom.clientWidth) / 2, (zoom.scrollHeight - zoom.clientHeight) / 2);
+		if (copy instanceof HTMLImageElement && !copy.complete) copy.addEventListener('load', centre, { once: true });
+		else centre();
+		if (copy instanceof HTMLVideoElement) copy.play().catch(() => {});
+	};
+	// opened with the mouse: the dialog gives focus back to the picture on close, which browsers
+	// treat as keyboard focus (it would keep its badge showing), so drop that focus again
+	let byMouse = false;
+	zoom.addEventListener('close', () => {
+		if (byMouse) (document.activeElement as HTMLElement | null)?.blur();
+	});
+	document.addEventListener('click', (e) => {
+		const el = (e.target as Element).closest<HTMLElement>('.zoomable');
+		if (!el) return;
+		byMouse = true;
+		open(el);
+	});
+	document.addEventListener('keydown', (e) => {
+		const el = (e.target as Element).closest?.<HTMLElement>('.zoomable');
+		if (el && (e.key === 'Enter' || e.key === ' ')) {
+			e.preventDefault();
+			byMouse = false;
+			open(el);
+		}
+	});
+	zoom.addEventListener('click', (e) => {
+		const target = e.target as HTMLElement;
+		if (target instanceof HTMLImageElement || target instanceof HTMLVideoElement) target.classList.toggle('actual');
+		else if (!target.closest('pre')) zoom.close();
+	});
+</script>
+
+<style is:global>
+	.zoomable {
+		cursor: zoom-in;
+	}
+
+	.zoomable:focus-visible {
+		outline: 2px solid var(--color-yellow);
+		outline-offset: 2px;
+	}
+
+	.zoom-wrap {
+		position: relative;
+		display: block;
+	}
+
+	.zoom-badge {
+		position: absolute;
+		z-index: 1;
+		top: 0.6rem;
+		right: 0.6rem;
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		border: 1.5px solid #17171c;
+		background: var(--color-yellow)
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317171c' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6'/%3E%3Cpath d='M15 15l5 5M10.5 8v5M8 10.5h5'/%3E%3C/svg%3E")
+			center / 60% no-repeat;
+		pointer-events: none;
+	}
+
+	/* hovering a zoomable item: its badge wiggles (runs even with OS animations off) */
+	.zoom-wrap:is(:hover, :focus-within) > .zoom-badge,
+	:has(> .zoomable:is(:hover, :focus-visible)) > .zoom-badge {
+		animation: zoom-wiggle 0.5s ease;
+	}
+
+	@keyframes zoom-wiggle {
+		25% {
+			transform: rotate(-18deg) scale(1.15);
+		}
+		50% {
+			transform: rotate(14deg) scale(1.15);
+		}
+		75% {
+			transform: rotate(-8deg);
+		}
+	}
+
+	dialog.zoom {
+		width: 100vw;
+		height: 100dvh;
+		max-width: none;
+		max-height: none;
+		margin: 0;
+		padding: 2rem;
+		border: 0;
+		background: transparent;
+		overflow: auto;
+		cursor: zoom-out;
+	}
+
+	dialog.zoom[open] {
+		display: flex;
+	}
+
+	dialog.zoom::backdrop {
+		background: rgb(12 12 16 / 0.88);
+		backdrop-filter: blur(4px);
+	}
+
+	/* margin: auto centres it, and still lets an oversized one scroll from its top-left */
+	dialog.zoom > :is(img, video, pre) {
+		margin: auto;
+		border-radius: var(--radius-md);
+	}
+
+	dialog.zoom > :is(img, video) {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+		background: #fff;
+		cursor: zoom-in;
+	}
+
+	/* clicked: the picture at its full resolution, scrolled around */
+	dialog.zoom > .actual {
+		max-width: none;
+		max-height: none;
+		cursor: zoom-out;
+	}
+
+	dialog.zoom > .zoom-close {
+		position: fixed;
+		left: 1rem;
+		bottom: calc(1rem + env(safe-area-inset-bottom));
+		width: 4rem;
+		height: 4rem;
+		margin: 0;
+		box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+		cursor: pointer;
+	}
+
+	/* next to the back button: a pill in the same yellow */
+	dialog.zoom > .zoom-project {
+		position: fixed;
+		left: 6rem;
+		bottom: calc(1.5rem + env(safe-area-inset-bottom));
+		width: auto;
+		height: 3rem;
+		padding: 0 1.25rem;
+		margin: 0;
+		font-weight: 700;
+		white-space: nowrap;
+		box-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+	}
+
+	dialog.zoom > pre {
+		max-width: 100%;
+		padding: 1.5rem 2rem;
+		font-size: 1.1rem;
+		line-height: 1.6;
+		overflow: auto;
+		cursor: auto;
+	}
+</style>

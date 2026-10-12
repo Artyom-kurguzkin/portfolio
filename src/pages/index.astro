@@ -5,10 +5,26 @@ import Layout from '../layouts/Layout.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import { Content as AboutContent } from '../data/about.md';
 import { Content as ContactContent } from '../data/contact.md';
+import photos from '../data/instagram.json'; // written by scripts/instagram.mjs before dev/build
+import Zoom from '../components/Zoom.astro';
 
 const projects = (await getCollection('projects', (p) => !p.data.draft)).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 );
+const assets = import.meta.glob<{ default: ImageMetadata }>('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' }) as unknown as Record<string, ImageMetadata>;
+// gallery: Instagram photos plus each project's hero picture (which links back to its project)
+const url = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+const gallery = [
+	...photos.map((p) => ({ src: url(p.src), alt: p.caption.split(String.fromCharCode(10))[0] || 'Photo', project: undefined })),
+	...projects.flatMap((p) => {
+		const project = url(`projects/${p.id}/`);
+		// the hero, then every picture in the page body (local ones; their files come from src/assets)
+		const body = [...(p.body ?? '').matchAll(/!\[([^\]]*)\]\(\.\.\/\.\.\/assets\/([^)]+)\)/g)]
+			.map(([, alt, path]) => ({ src: assets[`../assets/${path}`]?.src, alt, project }))
+			.filter((g) => g.src);
+		return [...(p.data.image ? [{ src: url(p.data.image), alt: p.data.title, project }] : []), ...body];
+	}),
+];
 const writings = (await getCollection('writings')).sort(
 	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
 );
@@ -73,10 +89,123 @@ const writings = (await getCollection('writings')).sort(
 				}
 			</ul>
 		</div>
+
+		{
+			gallery.length > 0 && (
+				<div class="panel photos">
+					<h2>
+						Photos <span class="pill count" style="background:var(--color-yellow);color:var(--color-ink)">{gallery.length}</span>
+						<!-- opens the gallery (script below), then goes away -->
+						<button type="button" class="back gallery-button" aria-expanded="false" aria-controls="bento" aria-label="Show photos">
+							<svg class="icon-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+						</button>
+					</h2>
+					<!-- bento: hidden (and its photos not loaded) until opened; shuffled and sized by the script
+					     below; dense packing fills the gaps -->
+					<div class="bento" id="bento" hidden>
+						{gallery.map((g) => (
+							<span class="zoom-wrap">
+								<img
+									class="zoomable"
+									data-zoom={g.project ? undefined : 'fit'}
+									data-project={g.project}
+									tabindex="0"
+									role="button"
+									data-src={g.src}
+									alt={g.alt}
+									loading="lazy"
+								/>
+								<span class="zoom-badge" aria-hidden="true" />
+							</span>
+						))}
+					</div>
+				</div>
+			)
+		}
 	</div>
+	<Zoom />
 </Layout>
 
 <script>
+	// Photos bento. Closed on arrival (its photos aren't even requested); the arrow button opens it:
+	// the tiles pop in, then shuffle once. Every shuffle re-sizes the tiles with a repeating pattern of
+	// big, wide and tall tiles (every 10 tiles fill 3 rows of 6, or 6 rows of 3 on phones), and the
+	// tiles glide from their old places to the new ones.
+	const bento = document.querySelector<HTMLElement>('.bento');
+	const galleryButton = document.querySelector<HTMLButtonElement>('.gallery-button');
+	// Blocks that each fill whole rows at both 6 and 3 columns, so the grid always closes:
+	// the main 10-tile block (3 rows of 6), and row blocks of 6, 5 or 4 tiles (1 row of 6).
+	const MAIN = ['big', 'one', 'one', 'wide', 'one', 'one', 'tall', 'one', 'big', 'one'];
+	const ROW: Record<number, string[]> = {
+		6: ['one', 'one', 'one', 'one', 'one', 'one'],
+		5: ['wide', 'one', 'one', 'one', 'one'],
+		4: ['wide', 'one', 'wide', 'one'],
+	};
+	// what's left after the main blocks, as row blocks; 1, 2, 3 and 7 don't split, so one main
+	// block is broken up and re-split together with them
+	const SPLIT: Record<number, number[]> = { 0: [], 4: [4], 5: [5], 6: [6], 8: [4, 4], 9: [4, 5], 11: [6, 5], 12: [6, 6], 13: [4, 4, 5], 17: [6, 6, 5] };
+	const shuffle = (bento: HTMLElement) => {
+		const tiles = [...bento.children] as HTMLElement[];
+		for (let i = tiles.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+		}
+		let mains = Math.floor(tiles.length / 10);
+		let rest = tiles.length % 10;
+		if (!SPLIT[rest] && mains > 0) {
+			mains--;
+			rest += 10;
+		}
+		const sizes = [...Array(mains).fill(MAIN).flat(), ...(SPLIT[rest] ?? [rest]).flatMap((n) => ROW[n] ?? Array(n).fill('one'))];
+		tiles.forEach((t, i) => {
+			t.className = `zoom-wrap tile-${sizes[i]}`;
+			bento.append(t);
+		});
+	};
+	// FLIP: each tile starts drawn where it was and moves to where it is now
+	const shuffleAnimated = (bento: HTMLElement) => {
+		const tiles = [...bento.children] as HTMLElement[];
+		const before = new Map(tiles.map((t) => [t, t.getBoundingClientRect()]));
+		shuffle(bento);
+		for (const t of tiles) {
+			const a = before.get(t)!;
+			const b = t.getBoundingClientRect();
+			if (!b.width) continue;
+			t.animate(
+				[{ transformOrigin: 'top left', transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})` }, { transformOrigin: 'top left', transform: 'none' }],
+				{ duration: 600, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+			);
+		}
+	};
+	if (bento && galleryButton) {
+		shuffle(bento);
+		// the whole collapsed card opens it (the button stays as the keyboard way in)
+		const card = bento.closest<HTMLElement>('.photos')!;
+		card.classList.add('collapsed');
+		const openGallery = () => {
+			if (!card.classList.contains('collapsed')) return;
+			card.classList.remove('collapsed');
+			bento.querySelectorAll<HTMLImageElement>('img[data-src]').forEach((img) => (img.src = img.dataset.src!));
+			bento.hidden = false;
+			galleryButton.remove(); // focus would otherwise fall to <body>
+			bento.querySelector<HTMLElement>('img')?.focus({ preventScroll: true });
+			// opening: tiles pop in one after another, in reading order, then the gallery shuffles once
+			// the whole cascade takes POP_MS however many tiles there are, so the shuffle follows straight on
+			const POP_MS = 600;
+			const tiles = [...bento.children];
+			const pops = tiles.map((t, i) =>
+				t.animate([{ opacity: 0, transform: 'translateY(-1.5rem) scale(0.85)' }, { opacity: 1, transform: 'none' }], {
+					duration: 300,
+					delay: (i / tiles.length) * (POP_MS - 300),
+					easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+					fill: 'backwards',
+				})
+			);
+			Promise.all(pops.map((a) => a.finished)).then(() => shuffleAnimated(bento));
+		};
+		card.addEventListener('click', openGallery);
+	}
+
 	// "Hi, I'm Artyom 😊": every symbol gets its own colour, never the same as its neighbours,
 	// re-picked every PERIOD_MS. Symbols are split across 4 timers that start OFFSET_MS apart.
 	const PALETTE = ['var(--color-blue)', 'var(--color-green)', 'var(--color-yellow)'];
@@ -157,7 +286,8 @@ const writings = (await getCollection('writings')).sort(
 		grid-template-areas:
 			'about'
 			'projects'
-			'writings';
+			'writings'
+			'photos';
 	}
 
 	/* tablet: About on top */
@@ -167,7 +297,8 @@ const writings = (await getCollection('writings')).sort(
 			grid-template-areas:
 				'about about'
 				'projects projects'
-				'writings writings';
+				'writings writings'
+				'photos photos';
 		}
 	}
 
@@ -178,7 +309,8 @@ const writings = (await getCollection('writings')).sort(
 			grid-template-columns: 1fr 1fr 1fr;
 			grid-template-areas:
 				'about about about'
-				'projects projects writings';
+				'projects projects writings'
+				'photos photos photos';
 		}
 	}
 
@@ -236,6 +368,104 @@ const writings = (await getCollection('writings')).sort(
 
 	.projects h2 {
 		color: var(--color-green);
+	}
+
+	.photos {
+		grid-area: photos;
+	}
+
+	.photos h2 {
+		color: var(--color-yellow);
+	}
+
+	.bento[hidden] {
+		display: none;
+	}
+
+	/* the round yellow arrow next to the title, which bobs on hover */
+	.gallery-button {
+		width: 2.5rem;
+		height: 2.5rem;
+		padding: 0;
+		border: 0;
+		margin-left: auto;
+		cursor: pointer;
+		/* the shared .back look, minus its phone pinning and hover nudge (relative: its yellow
+		   fill is an absolutely placed ::before) */
+		position: relative;
+		inset: auto;
+		box-shadow: none;
+		transform: none;
+	}
+
+	/* collapsed: the whole card is the button, and hovering it bobs the arrow */
+	.photos.collapsed {
+		cursor: pointer;
+	}
+
+	.photos.collapsed:hover .icon-open,
+	.gallery-button:is(:hover, :focus-visible) .icon-open {
+		animation: gallery-bob 0.6s ease;
+	}
+
+	@keyframes gallery-bob {
+		40% {
+			transform: translateY(4px);
+		}
+		70% {
+			transform: translateY(-2px);
+		}
+	}
+
+	/* bento: square cells (row height = column width, via the card's width), some tiles span 2 */
+	.photos {
+		container-type: inline-size;
+	}
+
+	.bento {
+		--cols: 3;
+		--gap: 0.5rem;
+		display: grid;
+		grid-template-columns: repeat(var(--cols), 1fr);
+		grid-auto-rows: calc((100cqi - (var(--cols) - 1) * var(--gap)) / var(--cols));
+		grid-auto-flow: dense;
+		gap: var(--gap);
+		margin-top: 1rem;
+	}
+
+	@container (min-width: 40rem) {
+		.bento {
+			--cols: 6;
+		}
+	}
+
+	.bento .tile-big {
+		grid-column: span 2;
+		grid-row: span 2;
+	}
+
+	.bento .tile-wide {
+		grid-column: span 2;
+	}
+
+	.bento .tile-tall {
+		grid-row: span 2;
+	}
+
+	/* gallery: the badge only shows (and wiggles) on the hovered photo, or one reached with Tab */
+	.bento .zoom-badge {
+		display: none;
+	}
+
+	.bento .zoom-wrap:is(:hover, :has(:focus-visible)) > .zoom-badge {
+		display: block;
+	}
+
+	.bento img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: var(--radius-md);
 	}
 
 	.writings {

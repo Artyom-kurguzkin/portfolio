@@ -24,3 +24,6 @@ pnpm-debug.log*
 .idea/
 
 **/local/**
+# fetched at build time by scripts/instagram.mjs
+public/instagram/
+src/data/instagram.json

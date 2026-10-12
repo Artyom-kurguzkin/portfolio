@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 import SectionCards from '../../components/SectionCards.astro';
+import Zoom from '../../components/Zoom.astro';
 
 export async function getStaticPaths() {
 	const projects = await getCollection('projects', (p) => !p.data.draft);
@@ -86,6 +87,7 @@ const facts: [string, string | undefined][] = [
 			<Content />
 		</SectionCards>
 	</article>
+	<Zoom />
 </Layout>
 
 <script>
@@ -653,13 +655,7 @@ const facts: [string, string | undefined][] = [
 		layoutFlows();
 	};
 
-	// Zoom: click (or Enter) on a picture or code block opens it full screen, pictures at their
-	// full resolution. In there, a click on the picture toggles fit-to-screen; a click anywhere
-	// else, or Escape, closes it.
-	const zoom = document.createElement('dialog');
-	zoom.className = 'zoom';
-	zoom.setAttribute('aria-label', 'Enlarged view');
-	document.body.append(zoom);
+	// pictures and code become zoomable (dialog and badge styles: components/Zoom.astro)
 	const markZoomable = () =>
 		document.querySelectorAll<HTMLElement>('.board .hero-image, .board .card img, .board .card pre').forEach((el) => {
 			el.classList.add('zoomable');
@@ -683,37 +679,6 @@ const facts: [string, string | undefined][] = [
 			wrap.append(el, badge);
 		});
 	markZoomable();
-	const open = (el: HTMLElement) => {
-		const copy = el.cloneNode(true) as HTMLElement;
-		// a bare copy: the page's own classes, scoping attributes and sizes stay behind
-		[...copy.attributes]
-			.filter((a) => a.name.startsWith('data-astro') || ['class', 'style', 'tabindex', 'role', 'aria-label', 'loading'].includes(a.name))
-			.forEach((a) => copy.removeAttribute(a.name));
-		// pictures open straight at full resolution, scrolled to their centre
-		if (copy instanceof HTMLImageElement) copy.classList.add('actual');
-		zoom.replaceChildren(copy);
-		zoom.showModal();
-		const centre = () => zoom.scrollTo((zoom.scrollWidth - zoom.clientWidth) / 2, (zoom.scrollHeight - zoom.clientHeight) / 2);
-		if (copy instanceof HTMLImageElement && !copy.complete) copy.addEventListener('load', centre, { once: true });
-		else centre();
-		if (copy instanceof HTMLVideoElement) copy.play().catch(() => {});
-	};
-	document.addEventListener('click', (e) => {
-		const el = (e.target as Element).closest<HTMLElement>('.zoomable');
-		if (el) open(el);
-	});
-	document.addEventListener('keydown', (e) => {
-		const el = (e.target as Element).closest?.<HTMLElement>('.zoomable');
-		if (el && (e.key === 'Enter' || e.key === ' ')) {
-			e.preventDefault();
-			open(el);
-		}
-	});
-	zoom.addEventListener('click', (e) => {
-		const target = e.target as HTMLElement;
-		if (target instanceof HTMLImageElement || target instanceof HTMLVideoElement) target.classList.toggle('actual');
-		else if (!target.closest('pre')) zoom.close();
-	});
 	let width = 0;
 	new ResizeObserver(([entry]) => {
 		if (entry.contentRect.width === width) return; // our own height changes don't need a re-run
@@ -927,15 +892,7 @@ const facts: [string, string | undefined][] = [
 	}
 
 	/* --- zoom: pictures and code open full screen on click (script above) --- */
-	.board :global(.zoomable:focus-visible) {
-		outline: 2px solid var(--color-yellow);
-		outline-offset: 2px;
-	}
-
-	/* a small magnifier badge always shows on each zoomable's top-right corner */
 	.board :global(.zoom-wrap) {
-		position: relative;
-		display: block;
 		width: 100%;
 		margin: 0 auto 0.5rem;
 	}
@@ -948,96 +905,10 @@ const facts: [string, string | undefined][] = [
 		margin: 0;
 	}
 
-	.board :global(.zoom-badge) {
-		position: absolute;
-		z-index: 1;
-		top: 0.6rem;
-		right: 0.6rem;
-		width: 2rem;
-		height: 2rem;
-		border-radius: 50%;
-		border: 1.5px solid #17171c;
-		background: var(--color-yellow)
-			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317171c' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6'/%3E%3Cpath d='M15 15l5 5M10.5 8v5M8 10.5h5'/%3E%3C/svg%3E")
-			center / 60% no-repeat;
-		pointer-events: none;
-	}
-
 	.hero > .zoom-badge {
 		top: 1.25rem;
 		right: 1.25rem;
 	}
-
-	/* hovering a picture or code block: the badge wiggles (runs even with OS animations off) */
-	.board :global(.zoom-wrap:is(:hover, :focus-within) > .zoom-badge),
-	.hero:has(.hero-image:is(:hover, :focus-visible)) > .zoom-badge {
-		animation: zoom-wiggle 0.5s ease;
-	}
-
-	@keyframes zoom-wiggle {
-		25% {
-			transform: rotate(-18deg) scale(1.15);
-		}
-		50% {
-			transform: rotate(14deg) scale(1.15);
-		}
-		75% {
-			transform: rotate(-8deg);
-		}
-	}
-
-	:global(dialog.zoom) {
-		width: 100vw;
-		height: 100dvh;
-		max-width: none;
-		max-height: none;
-		margin: 0;
-		padding: 2rem;
-		border: 0;
-		background: transparent;
-		overflow: auto;
-		cursor: zoom-out;
-	}
-
-	:global(dialog.zoom[open]) {
-		display: flex;
-	}
-
-	:global(dialog.zoom::backdrop) {
-		background: rgb(12 12 16 / 0.88);
-		backdrop-filter: blur(4px);
-	}
-
-	/* margin: auto centres it, and still lets an oversized one scroll from its top-left */
-	:global(dialog.zoom > :is(img, video, pre)) {
-		margin: auto;
-		border-radius: var(--radius-md);
-	}
-
-	:global(dialog.zoom > :is(img, video)) {
-		max-width: 100%;
-		max-height: 100%;
-		object-fit: contain;
-		background: #fff;
-		cursor: zoom-in;
-	}
-
-	/* clicked: the picture at its full resolution, scrolled around */
-	:global(dialog.zoom > .actual) {
-		max-width: none;
-		max-height: none;
-		cursor: zoom-out;
-	}
-
-	:global(dialog.zoom > pre) {
-		max-width: 100%;
-		padding: 1.5rem 2rem;
-		font-size: 1.1rem;
-		line-height: 1.6;
-		overflow: auto;
-		cursor: auto;
-	}
-
 
 	/* --- hero --- */
 	.hero {
