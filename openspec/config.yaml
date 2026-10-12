@@ -1,0 +1,19 @@
+schema: spec-driven
+
+context: |
+  Artyom Kurguzkin's personal portfolio: Astro 7 static site with content collections, plain CSS
+  tokens in src/styles/global.css and small inline scripts, no UI framework. Deployed to GitHub
+  Pages (artyom-kurguzkin.com) by .github/workflows/deploy.yml.
+  Projects: src/content/projects/*.md (front matter builds the hero; "##" sections and "###"
+  subsections become cards). Project page = components/SectionCards.astro (markup) + the layout
+  script and styles in pages/projects/[...slug].astro. Zoom = components/Zoom.astro.
+  Instagram photos are fetched at build time by scripts/instagram.mjs (token: INSTAGRAM_TOKEN).
+  Source materials live in local/ (gitignored).
+
+rules:
+  specs:
+    - Scenario titles are short and imperative
+    - Facts on pages come only from the owner or their materials
+  tasks:
+    - A UI task is done only after Playwright screenshots at about 1940px, 1200px and 375px have been inspected
+    - Never commit unless the owner asks
